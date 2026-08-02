@@ -17,8 +17,7 @@ E - black queen   (0x45)
 F - black king    (0x46)
 
 TODO:
-- Implement chess rules (and per-piece rules)
-- Implement user interaction
+- Generate legal moves
 - Implement bot API
 */
 
@@ -33,9 +32,13 @@ enum {
 enum {
     CHESS_COLOR_WHITE_SQUARE = 0,
     CHESS_COLOR_BLACK_SQUARE = 1,
-    CHESS_COLOR_WHITE_SQUARE_DOT = 2,
-    CHESS_COLOR_BLACK_SQUARE_DOT = 3,
-    CHESS_COLOR_NUMBER = 4,
+    CHESS_COLOR_WHITE_SQUARE_HIGHLIGHT = 2,
+    CHESS_COLOR_BLACK_SQUARE_HIGHLIGHT = 3,
+    CHESS_COLOR_WHITE_SQUARE_HIGHLIGHT_BOX = 4,
+    CHESS_COLOR_BLACK_SQUARE_HIGHLIGHT_BOX = 5,
+    CHESS_COLOR_WHITE_SQUARE_DOT = 6,
+    CHESS_COLOR_BLACK_SQUARE_DOT = 7,
+    CHESS_COLOR_NUMBER = 8,
 };
 
 enum {
@@ -50,15 +53,21 @@ enum {
 uint8_t colors[] = {
     238, 238, 238, // white square
     113, 134, 184, // black square
+    245, 246, 130, // highlighted white square
+    185, 202, 67,  // highlighted black square
+    252, 252, 211, // box highlight white square
+    206, 218, 195, // box highlight black square
     206, 206, 206, // white square dot
-    81, 102, 152, // black square dot
+    81, 102, 152,  // black square dot
 
     234, 237, 209, // white square
-    118, 149, 86, // black square
+    118, 149, 86,  // black square
     245, 246, 130, // highlighted white square
-    185, 202, 67, // highlighted black square
+    185, 202, 67,  // highlighted black square
+    252, 252, 211, // box highlight white square
+    206, 218, 195, // box highlight black square
     202, 203, 179, // white square dot
-    99, 128, 70, // black square dot
+    99, 128, 70,   // black square dot
 };
 
 typedef struct {
@@ -69,6 +78,12 @@ typedef struct {
     int8_t turn;
     char board[64];
     turtle_texture_t pieces[12];
+    int8_t mouseSquare; // square that the mouse is hovering over
+    int8_t mousePiece; // index 0-63 of piece of the board that the mouse is holding
+    int8_t highlightedSquare[3]; // selected with color CHESS_COLOR_X_SQUARE_HIGHLIGHT (up to 3)
+    int8_t highlightedSquareBox; // selected with color CHESS_COLOR_X_SQUARE_HIGHLIGHT_BOX
+    int8_t highlightUnselect;
+    list_t *dotSquares; // list of squares marked with a dot (for valid)
 
     /* board */
     double boardX;
@@ -85,6 +100,14 @@ void init() {
     /* chess */
     self.turn = TURN_WHITE;
     memcpy(self.board, "BCDEFDCBAAAAAAAA000000000000000000000000000000001111111123456432", 64);
+    self.mouseSquare = -1;
+    self.mousePiece = -1;
+    self.highlightedSquare[0] = -1;
+    self.highlightedSquare[1] = -1;
+    self.highlightedSquare[2] = -1;
+    self.highlightedSquareBox = -1;
+    self.highlightUnselect = 0;
+    self.dotSquares = list_init();
 
     /* textures */
     char *constructedFilepath = malloc(5120);
@@ -192,18 +215,42 @@ turtle_texture_t getPiece(char code) {
 }
 
 void render() {
+    self.mouseSquare = -1;
     double xpos = self.boardX - self.boardSize;
     double ypos = self.boardY + self.boardSize;
     double shift = self.boardSize / 8;
     /* render board */
     int32_t color = 1;
     for (int32_t i = 0; i < 64; i++) {
-        if (color) {
-            setColor(CHESS_COLOR_WHITE_SQUARE);
-        } else {
-            setColor(CHESS_COLOR_BLACK_SQUARE);
+        if (self.highlightedSquareBox == i) {
+            if (color) {
+                setColor(CHESS_COLOR_WHITE_SQUARE_HIGHLIGHT_BOX);
+            } else {
+                setColor(CHESS_COLOR_BLACK_SQUARE_HIGHLIGHT_BOX);
+            }
+            turtleRectangle(xpos - shift, ypos - shift, xpos + shift, ypos + shift);
         }
-        turtleRectangle(xpos - shift, ypos - shift, xpos + shift, ypos + shift);
+        if (color) {
+            if (self.highlightedSquare[0] == i || self.highlightedSquare[1] == i || self.highlightedSquare[2] == i) {
+                setColor(CHESS_COLOR_WHITE_SQUARE_HIGHLIGHT);
+            } else {
+                setColor(CHESS_COLOR_WHITE_SQUARE);
+            }
+        } else {
+            if (self.highlightedSquare[0] == i || self.highlightedSquare[1] == i || self.highlightedSquare[2] == i) {
+                setColor(CHESS_COLOR_BLACK_SQUARE_HIGHLIGHT);
+            } else {
+                setColor(CHESS_COLOR_BLACK_SQUARE);
+            }
+        }
+        if (self.highlightedSquareBox == i) {
+            turtleRectangle(xpos - shift * 0.9, ypos - shift * 0.9, xpos + shift * 0.9, ypos + shift * 0.9);
+        } else {
+            turtleRectangle(xpos - shift, ypos - shift, xpos + shift, ypos + shift);
+        }
+        if (turtle.mouseX > xpos - shift && turtle.mouseX <= xpos + shift && turtle.mouseY > ypos - shift && turtle.mouseY <= ypos + shift) {
+            self.mouseSquare = i;
+        }
         if (i % 8 == 0) {
             /* draw number */
             if (color) {
@@ -237,7 +284,7 @@ void render() {
     for (int32_t i = 0; i < 64; i++) {
         if (self.board[i] != 0) {
             turtle_texture_t texture = getPiece(self.board[i]);
-            if (texture != -1) {
+            if (texture != -1 && self.mousePiece != i) {
                 turtleTexture(texture, xpos - shift, ypos - shift, xpos + shift, ypos + shift, 0);
             }
         }
@@ -247,6 +294,12 @@ void render() {
             ypos -= shift * 2;
         }
     }
+    if (self.mousePiece != -1) {
+        turtle_texture_t texture = getPiece(self.board[self.mousePiece]);
+        if (texture != -1) {
+            turtleTexture(texture, turtle.mouseX - shift, turtle.mouseY - shift, turtle.mouseX + shift, turtle.mouseY + shift, 0);
+        }
+    }
 }
 
 void mouse() {
@@ -254,12 +307,32 @@ void mouse() {
         if (self.keys[KEYS_LMB] == 0) {
             /* first tick */
             self.keys[KEYS_LMB] = 1;
+            self.mousePiece = self.mouseSquare;
+            if (self.board[self.mousePiece] != '0') {
+                if (self.highlightedSquare[0] == self.mousePiece) {
+                    self.highlightUnselect = 1;
+                }
+                self.highlightedSquare[0] = self.mousePiece;
+                /* generate legal moves - TODO */
+            } else {
+                self.highlightedSquare[0] = -1;
+                self.mousePiece = -1;
+            }
         } else {
             /* mouse held */
+            if (self.mousePiece != -1) {
+                self.highlightedSquareBox = self.mouseSquare;
+            }
         }
     } else {
         if (self.keys[KEYS_LMB] == 1) {
             self.keys[KEYS_LMB] = 0;
+            if (self.mouseSquare == self.mousePiece && self.highlightUnselect) {
+                self.highlightedSquare[0] = -1;
+            }
+            self.mousePiece = -1;
+            self.highlightedSquareBox = -1;
+            self.highlightUnselect = 0;
         }
     }
 }
