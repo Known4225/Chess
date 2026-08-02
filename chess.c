@@ -15,6 +15,11 @@ C - black knight  (0x43)
 D - black bishop  (0x44)
 E - black queen   (0x45)
 F - black king    (0x46)
+
+TODO:
+- Implement chess rules (and per-piece rules)
+- Implement user interaction
+- Implement bot API
 */
 
 #include "turtle.h"
@@ -23,6 +28,14 @@ F - black king    (0x46)
 enum {
     CHESS_THEME_DEFAULT = 0,
     CHESS_THEME_CHESS_COM = 1,
+};
+
+enum {
+    CHESS_COLOR_WHITE_SQUARE = 0,
+    CHESS_COLOR_BLACK_SQUARE = 1,
+    CHESS_COLOR_WHITE_SQUARE_DOT = 2,
+    CHESS_COLOR_BLACK_SQUARE_DOT = 3,
+    CHESS_COLOR_NUMBER = 4,
 };
 
 enum {
@@ -35,10 +48,17 @@ enum {
 };
 
 uint8_t colors[] = {
+    238, 238, 238, // white square
+    113, 134, 184, // black square
+    206, 206, 206, // white square dot
+    81, 102, 152, // black square dot
 
-
-    234, 237, 209, // white squares
-    118, 149, 86, // black squares
+    234, 237, 209, // white square
+    118, 149, 86, // black square
+    245, 246, 130, // highlighted white square
+    185, 202, 67, // highlighted black square
+    202, 203, 179, // white square dot
+    99, 128, 70, // black square dot
 };
 
 typedef struct {
@@ -60,7 +80,7 @@ typedef struct {
 chess_t self;
 
 void init() {
-    self.theme = CHESS_THEME_DEFAULT;
+    self.theme = CHESS_THEME_CHESS_COM;
 
     /* chess */
     self.turn = TURN_WHITE;
@@ -125,6 +145,10 @@ void init() {
     self.boardSize = 160;
 }
 
+void setColor(int32_t color) {
+    turtlePenColor(colors[self.theme * CHESS_COLOR_NUMBER * 3 + color * 3 + 0], colors[self.theme * CHESS_COLOR_NUMBER * 3 + color * 3 + 1], colors[self.theme * CHESS_COLOR_NUMBER * 3 + color * 3 + 2]);
+}
+
 /* import a file to board */
 int32_t import(char *filename) {
 
@@ -175,18 +199,37 @@ void render() {
     int32_t color = 1;
     for (int32_t i = 0; i < 64; i++) {
         if (color) {
-            tt_setColor(TT_COLOR_WHITE);
+            setColor(CHESS_COLOR_WHITE_SQUARE);
         } else {
-            tt_setColor(TT_COLOR_BLACK);
+            setColor(CHESS_COLOR_BLACK_SQUARE);
+        }
+        turtleRectangle(xpos - shift, ypos - shift, xpos + shift, ypos + shift);
+        if (i % 8 == 0) {
+            /* draw number */
+            if (color) {
+                setColor(CHESS_COLOR_BLACK_SQUARE);
+            } else {
+                setColor(CHESS_COLOR_WHITE_SQUARE);
+            }
+            turtleTextWriteStringf(xpos - shift * 0.85, ypos + shift * 0.66, shift * 0.32, 0, "%d", 8 - i / 8);
+        }
+        if (i > 55) {
+            /* draw number */
+            if (color) {
+                setColor(CHESS_COLOR_BLACK_SQUARE);
+            } else {
+                setColor(CHESS_COLOR_WHITE_SQUARE);
+            }
+            turtleTextWriteStringf(xpos + shift * 0.85, ypos - shift * 0.66, shift * 0.32, 100, "%c", 'a' + i % 8);
         }
         color = !color;
-        turtleRectangle(xpos - shift, ypos - shift, xpos + shift, ypos + shift);
         xpos += shift * 2;
         if (i % 8 == 7) {
             xpos = self.boardX - self.boardSize;
             ypos -= shift * 2;
             color = !color;
         }
+        
     }
     /* render pieces */
     xpos = self.boardX - self.boardSize;
@@ -267,7 +310,7 @@ void parseRibbonOutput() {
 
 int main(int argc, char *argv[]) {
     /* create window */
-    GLFWwindow *window = turtleCreateWindowIcon(TURTLE_WINDOW_DEFAULT_WIDTH, TURTLE_WINDOW_DEFAULT_HEIGHT, "turtle demo", "images/thumbnail.png");
+    GLFWwindow *window = turtleCreateWindowIcon(TURTLE_WINDOW_DEFAULT_WIDTH, TURTLE_WINDOW_DEFAULT_HEIGHT, "chess", "images/thumbnail.png");
     if (window == NULL) {
         return -1; // failed to create window
     }
