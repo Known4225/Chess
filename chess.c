@@ -108,7 +108,7 @@ void init() {
 
     /* chess */
     self.turn = CHESS_WHITE;
-    memcpy(self.board, "BCDEFDCBAAAAAAAA000000000000500000000000000000001111111123456432", 64);
+    memcpy(self.board, "BCDEFDCBAAAAAAAA000000000000000000000000000000001111111123456432", 64);
     self.mouseSquare = -1;
     self.mousePiece = -1;
     self.highlightedSquare[0] = -1;
@@ -431,11 +431,67 @@ void generateLegalMoves(int8_t position) {
     list_clear(self.dotSquares);
     if (type == CHESS_PIECE_PAWN) {
         /* pawn */
+        int8_t (*direction[3]) (int8_t position);
+        int8_t pawnPowerRow;
         if (color == CHESS_WHITE) {
-
+            int8_t (*directionCopy[3]) (int8_t position) = {
+                up, upLeft, upRight,
+            };
+            memcpy(direction, directionCopy, sizeof(void *) * 3);
+            pawnPowerRow = 6;
         } else {
-
+            int8_t (*directionCopy[3]) (int8_t position) = {
+                down, downLeft, downRight,
+            };
+            memcpy(direction, directionCopy, sizeof(void *) * 3);
+            pawnPowerRow = 1;
         }
+        /* go up */
+        int8_t wanderingPosition = direction[0](position);
+        if (wanderingPosition != -1) {
+            if (self.board[wanderingPosition] != '0') {
+                chess_color_t wanderingColor = getPieceColor(self.board[wanderingPosition]);
+                if (wanderingColor != color) {
+                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                }
+            } else {
+                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+            }
+        }
+        /* possible: go up again */
+        if (position / 8 == pawnPowerRow) {
+            wanderingPosition = direction[0](wanderingPosition);
+            if (wanderingPosition != -1) {
+                if (self.board[wanderingPosition] != '0') {
+                    chess_color_t wanderingColor = getPieceColor(self.board[wanderingPosition]);
+                    if (wanderingColor != color) {
+                        list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                    }
+                } else {
+                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                }
+            }
+        }
+        /* check for capture */
+        wanderingPosition = direction[1](position);
+        if (wanderingPosition != -1) {
+            if (self.board[wanderingPosition] != '0') {
+                chess_color_t wanderingColor = getPieceColor(self.board[wanderingPosition]);
+                if (wanderingColor != color) {
+                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                }
+            }
+        }
+        wanderingPosition = direction[2](position);
+        if (wanderingPosition != -1) {
+            if (self.board[wanderingPosition] != '0') {
+                chess_color_t wanderingColor = getPieceColor(self.board[wanderingPosition]);
+                if (wanderingColor != color) {
+                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                }
+            }
+        }
+        /* TODO - en passant */
     } else if (type == CHESS_PIECE_ROOK) {
         int8_t (*direction[4]) (int8_t position) = {
             up, right, down, left,
