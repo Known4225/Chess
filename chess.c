@@ -129,7 +129,7 @@ void init() {
 
     /* chess */
     self.turn = CHESS_WHITE;
-    memcpy(self.board, "HCDEIDCHAAAAAAAA000000000000000000000000000000001111111183459438", 64);
+    memcpy(self.board, "HCDEIDCHAAAAAAAA000000000050000000000000000000001111111183459438", 64);
     self.mouseSquare = -1;
     self.mousePiece = -1;
     self.highlightedSquare[0] = -1;
@@ -492,16 +492,16 @@ static inline int8_t downRight(int8_t position) {
     return down(right(position));
 }
 
-void generateLegalMoves(int8_t position) {
+void generateLegalMoves(char *board, int8_t position, int8_t turn) {
     if (position == -1) {
         return;
     }
-    chess_piece_t type = getPieceType(self.board[position]);
-    chess_color_t color = getPieceColor(self.board[position]);
+    chess_piece_t type = getPieceType(board[position]);
+    chess_color_t color = getPieceColor(board[position]);
     if (type == -1 || color == -1) {
         return;
     }
-    if (color != self.turn) {
+    if (color != turn) {
         return;
     }
     list_clear(self.dotSquares);
@@ -525,7 +525,7 @@ void generateLegalMoves(int8_t position) {
         /* go up */
         int8_t wanderingPosition = direction[0](position);
         if (wanderingPosition != -1) {
-            if (self.board[wanderingPosition] == '0' || getPieceColor(self.board[wanderingPosition]) != color) {
+            if (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color) {
                 list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
@@ -533,7 +533,7 @@ void generateLegalMoves(int8_t position) {
         if (position / 8 == pawnPowerRow) {
             wanderingPosition = direction[0](wanderingPosition);
             if (wanderingPosition != -1) {
-                if (self.board[wanderingPosition] == '0' || getPieceColor(self.board[wanderingPosition]) != color) {
+                if (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color) {
                     list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                 }
             }
@@ -541,13 +541,13 @@ void generateLegalMoves(int8_t position) {
         /* check for capture */
         wanderingPosition = direction[1](position);
         if (wanderingPosition != -1) {
-            if (self.board[wanderingPosition] != '0' && getPieceColor(self.board[wanderingPosition]) != color) {
+            if (board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) {
                 list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
         wanderingPosition = direction[2](position);
         if (wanderingPosition != -1) {
-            if (self.board[wanderingPosition] != '0' && getPieceColor(self.board[wanderingPosition]) != color) {
+            if (board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) {
                 list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
@@ -563,10 +563,10 @@ void generateLegalMoves(int8_t position) {
                 if (wanderingPosition == -1) {
                     break;
                 }
-                if (self.board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == '0') {
                     list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                 } else {
-                    if (getPieceColor(self.board[wanderingPosition]) != color) {
+                    if (getPieceColor(board[wanderingPosition]) != color) {
                         list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                     }
                     break;
@@ -581,11 +581,11 @@ void generateLegalMoves(int8_t position) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
             int8_t checkPosition = direction[j + 1](wanderingPosition);
-            if (checkPosition != -1 && (self.board[checkPosition] == '0')) {
+            if (checkPosition != -1 && (board[checkPosition] == '0')) {
                 list_append(self.dotSquares, (unitype) checkPosition, 'c');
             }
             checkPosition = direction[j + 2](wanderingPosition);
-            if (checkPosition != -1 && (self.board[checkPosition] == '0')) {
+            if (checkPosition != -1 && (board[checkPosition] == '0')) {
                 list_append(self.dotSquares, (unitype) checkPosition, 'c');
             }
         }
@@ -600,10 +600,10 @@ void generateLegalMoves(int8_t position) {
                 if (wanderingPosition == -1) {
                     break;
                 }
-                if (self.board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == '0') {
                     list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                 } else {
-                    if (getPieceColor(self.board[wanderingPosition]) != color) {
+                    if (getPieceColor(board[wanderingPosition]) != color) {
                         list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                     }
                     break;
@@ -621,10 +621,10 @@ void generateLegalMoves(int8_t position) {
                 if (wanderingPosition == -1) {
                     break;
                 }
-                if (self.board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == '0') {
                     list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                 } else {
-                    if (getPieceColor(self.board[wanderingPosition]) != color) {
+                    if (getPieceColor(board[wanderingPosition]) != color) {
                         list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                     }
                     break;
@@ -639,7 +639,7 @@ void generateLegalMoves(int8_t position) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
             if (wanderingPosition != -1) {
-                if (self.board[wanderingPosition] == '0' || getPieceColor(self.board[wanderingPosition]) != color) {
+                if (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color) {
                     list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
                 }
             }
@@ -651,7 +651,7 @@ void generateAllMoves(char *filename) {
     list_clear(self.moves);
     for (int32_t position = 0; position < 64; position++) {
         if (self.board[position] != '0') {
-            generateLegalMoves(position);
+            generateLegalMoves(self.board, position, self.turn);
             char boardCopy[65];
             for (int32_t i = 0; i < self.dotSquares -> length; i++) {
                 if (self.turn == CHESS_WHITE) {
@@ -697,6 +697,13 @@ void generateAllMoves(char *filename) {
         }
     }
     list_clear(self.dotSquares);
+    /* second pass - validate legal moves are legal (don't put king in check, etc) */
+    for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+        for (int32_t position = 0; position < 64; position++) {
+            generateLegalMoves(self.moves -> data[movesIndex + MOVES_STRING].s + 1, position, !self.turn);
+
+        }
+    }
     printf("Number of moves: %d\n", self.moves -> length / MOVES_NUMBER_OF_FIELDS);
     FILE *fp = fopen(filename, "wb");
     if (fp == NULL) {
@@ -732,7 +739,7 @@ void mouse() {
                     self.highlightUnselect = 1;
                 }
                 self.highlightedSquare[0] = self.mousePiece;
-                generateLegalMoves(self.highlightedSquare[0]);
+                generateLegalMoves(self.board, self.highlightedSquare[0], self.turn);
             }
         } else {
             /* mouse held */
