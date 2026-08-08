@@ -272,12 +272,12 @@ chess_piece_t getPieceType(char code) {
         case 'G':
         return CHESS_PIECE_PAWN;
         case '2':
+        case '8':
         case 'B':
+        case 'H':
         return CHESS_PIECE_ROOK;
         case '3':
-        case '8':
         case 'C':
-        case 'H':
         return CHESS_PIECE_KNIGHT;
         case '4':
         case 'D':
@@ -696,6 +696,7 @@ void generateAllMoves(char *filename) {
             }
         }
     }
+    list_clear(self.dotSquares);
     printf("Number of moves: %d\n", self.moves -> length / MOVES_NUMBER_OF_FIELDS);
     FILE *fp = fopen(filename, "wb");
     if (fp == NULL) {
