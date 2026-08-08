@@ -24,7 +24,7 @@ I - black king that hasn't moved               (0x49)
 
 TODO:
 - Generate legal moves
-  - Challenges: en passant, castling
+  - Challenges: en passant, castling, cannot make move that results in check
 - Implement bot API
 */
 
