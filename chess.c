@@ -2,25 +2,25 @@
 Created by Ryan Srichai 02.08.26
 
 Piece reference:
-0 - blank space                    (0x30)
-1 - white pawn                     (0x31)
-2 - white rook                     (0x32)
-3 - white knight                   (0x33)
-4 - white bishop                   (0x34)
-5 - white queen                    (0x35)
-6 - white king                     (0x36)
-7 - white pawn that has just moved (0x37)
-8 - white rook that hasn't moved   (0x38)
-9 - white king that hasn't moved   (0x39)
-A - black pawn                     (0x41)
-B - black rook                     (0x42)
-C - black knight                   (0x43)
-D - black bishop                   (0x44)
-E - black queen                    (0x45)
-F - black king                     (0x46)
-G - black pawn that has just moved (0x47)
-H - black rook that hasn't moved   (0x48)
-I - black king that hasn't moved   (0x49)
+0 - blank space                                (0x30)
+1 - white pawn                                 (0x31)
+2 - white rook                                 (0x32)
+3 - white knight                               (0x33)
+4 - white bishop                               (0x34)
+5 - white queen                                (0x35)
+6 - white king                                 (0x36)
+7 - white pawn that has just moved two squares (0x37)
+8 - white rook that hasn't moved               (0x38)
+9 - white king that hasn't moved               (0x39)
+A - black pawn                                 (0x41)
+B - black rook                                 (0x42)
+C - black knight                               (0x43)
+D - black bishop                               (0x44)
+E - black queen                                (0x45)
+F - black king                                 (0x46)
+G - black pawn that has just moved two squares (0x47)
+H - black rook that hasn't moved               (0x48)
+I - black king that hasn't moved               (0x49)
 
 TODO:
 - Generate legal moves
@@ -30,6 +30,8 @@ TODO:
 
 #include "turtle.h"
 #include <time.h>
+
+void generateAllMoves(char *filename);
 
 typedef enum {
     CHESS_PIECE_PAWN = 0,
@@ -63,6 +65,13 @@ enum {
 
 enum {
     KEYS_LMB = 0,
+};
+
+enum {
+    MOVES_STRING = 0,
+    MOVES_FROM = 1,
+    MOVES_TO = 2,
+    MOVES_NUMBER_OF_FIELDS = 3,
 };
 
 uint8_t colors[] = {
@@ -105,6 +114,12 @@ typedef struct {
     double boardY;
     double boardSize;
 
+    /* engines */
+    list_t *moves; // see MOVES_X
+    char inputFilename[4096];
+    char outputFilename[4096];
+    tt_button_t *mohamed;
+    tt_button_t *ryan;
 } chess_t;
 
 chess_t self;
@@ -180,9 +195,21 @@ void init() {
     free(constructedFilepath);
 
     /* board */
-    self.boardX = 0;
-    self.boardY = -25;
+    self.boardX = -20;
+    self.boardY = -5;
     self.boardSize = 160;
+
+    /* engines */
+    self.moves = list_init();
+    strcpy(self.inputFilename, osToolsFileDialog.executableFilepath);
+    strcat(self.inputFilename, "input.txt");
+    strcpy(self.outputFilename, osToolsFileDialog.executableFilepath);
+    strcat(self.outputFilename, "output.txt");
+
+    self.mohamed = tt_buttonInit("Mohamed", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 9, 10);
+    self.mohamed -> align = TT_BUTTON_ALIGN_LEFT;
+    self.ryan = tt_buttonInit("Ryan", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 36, 10);
+    self.ryan -> align = TT_BUTTON_ALIGN_LEFT;
 }
 
 void setColor(int32_t color) {
@@ -297,9 +324,9 @@ chess_color_t getPieceColor(char code) {
 
 void render() {
     self.mouseSquare = -1;
-    double xpos = self.boardX - self.boardSize;
-    double ypos = self.boardY + self.boardSize;
     double shift = self.boardSize / 8;
+    double xpos = self.boardX - self.boardSize + shift;
+    double ypos = self.boardY + self.boardSize - shift;
     /* render board */
     int32_t color = 1;
     for (int32_t i = 0; i < 64; i++) {
@@ -353,14 +380,14 @@ void render() {
         color = !color;
         xpos += shift * 2;
         if (i % 8 == 7) {
-            xpos = self.boardX - self.boardSize;
+            xpos = self.boardX - self.boardSize + shift;
             ypos -= shift * 2;
             color = !color;
         }
     }
     /* render pieces */
-    xpos = self.boardX - self.boardSize;
-    ypos = self.boardY + self.boardSize;
+    xpos = self.boardX - self.boardSize + shift;
+    ypos = self.boardY + self.boardSize - shift;
     for (int32_t i = 0; i < 64; i++) {
         if (self.board[i] != '0') {
             turtle_texture_t texture = getPieceTexture(self.board[i]);
@@ -387,7 +414,7 @@ void render() {
         }
         xpos += shift * 2;
         if (i % 8 == 7) {
-            xpos = self.boardX - self.boardSize;
+            xpos = self.boardX - self.boardSize + shift;
             ypos -= shift * 2;
         }
     }
@@ -396,6 +423,16 @@ void render() {
         if (texture != -1) {
             turtleTexture(texture, turtle.mouseX - shift, turtle.mouseY - shift, turtle.mouseX + shift, turtle.mouseY + shift, 0);
         }
+    }
+
+    /* engine buttons */
+    if (self.mohamed -> value) {
+        self.mohamed -> value = 0;
+        generateAllMoves(self.inputFilename);
+    }
+    if (self.ryan -> value) {
+        self.ryan -> value = 0;
+        generateAllMoves(self.inputFilename);
     }
 }
 
@@ -462,6 +499,9 @@ void generateLegalMoves(int8_t position) {
     chess_piece_t type = getPieceType(self.board[position]);
     chess_color_t color = getPieceColor(self.board[position]);
     if (type == -1 || color == -1) {
+        return;
+    }
+    if (color != self.turn) {
         return;
     }
     list_clear(self.dotSquares);
@@ -605,6 +645,75 @@ void generateLegalMoves(int8_t position) {
             }
         }
     }
+}
+
+void generateAllMoves(char *filename) {
+    list_clear(self.moves);
+    for (int32_t position = 0; position < 64; position++) {
+        if (self.board[position] != '0') {
+            generateLegalMoves(position);
+            char boardCopy[65];
+            for (int32_t i = 0; i < self.dotSquares -> length; i++) {
+                if (self.turn == CHESS_WHITE) {
+                    boardCopy[0] = 'b';
+                } else {
+                    boardCopy[0] = 'w';
+                }
+                memcpy(boardCopy + 1, self.board, 64);
+                char piece = boardCopy[position + 1];
+                /* check if piece is pawn (with or without en passant), rook (that hasn't moved), or king (that hasn't moved) */
+                if (piece == '1' && position / 8 == 6 && self.dotSquares -> data[i].c / 8 == 4) {
+                    /* change normal pawn to en passant pawn */
+                    piece = '7';
+                } else if (piece == '7') {
+                    /* revert en passant to normal pawn */
+                    piece = '1';
+                } else if (piece == '8') {
+                    /* revert rook to has moved */
+                    piece = '2';
+                } else if (piece == '9') {
+                    /* revert king to has moved */
+                    piece = '6';
+                } else if (piece == 'A' && position / 8 == 1 && self.dotSquares -> data[i].c / 8 == 3) {
+                    /* change normal pawn to en passant pawn */
+                    piece = 'G';
+                } else if (piece == 'G') {
+                    /* revert en passant to normal pawn */
+                    piece = 'A';
+                } else if (piece == 'H') {
+                    /* revert rook to has moved */
+                    piece = 'B';
+                } else if (piece == 'I') {
+                    /* revert king to has moved */
+                    piece = 'F';
+                }
+                /* simulate piece moving */
+                boardCopy[position + 1] = '0';
+                boardCopy[self.dotSquares -> data[i].c + 1] = piece;
+                list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
+                list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+            }
+        }
+    }
+    printf("Number of moves: %d\n", self.moves -> length / MOVES_NUMBER_OF_FIELDS);
+    FILE *fp = fopen(filename, "wb");
+    if (fp == NULL) {
+        printf("ERROR: Could not open file %s\n", filename);
+        return;
+    }
+    char turnChar = 'w';
+    if (self.turn == CHESS_BLACK) {
+        turnChar = 'b';
+    }
+    fwrite(&turnChar, 1, 1, fp);
+    fwrite(self.board, 1, 64, fp);
+    fwrite("\n", 1, 1, fp);
+    for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+        fwrite(self.moves -> data[movesIndex + MOVES_STRING].s, 1, 65, fp);
+        fwrite("\n", 1, 1, fp);
+    }
+    fclose(fp);
 }
 
 void mouse() {
