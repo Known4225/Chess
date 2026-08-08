@@ -552,6 +552,8 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
             }
         }
         /* TODO - en passant */
+
+        /* Note: pawn promotion handled in generateAllMoves */
     } else if (type == CHESS_PIECE_ROOK) {
         int8_t (*direction[4]) (int8_t position) = {
             up, right, down, left,
@@ -644,6 +646,8 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 }
             }
         }
+        /* TODO - castling */
+
     }
 }
 
@@ -687,23 +691,54 @@ void generateAllMoves(char *filename) {
                     /* revert king to has moved */
                     piece = 'F';
                 }
-                /* simulate piece moving */
-                boardCopy[position + 1] = '0';
-                boardCopy[self.dotSquares -> data[i].c + 1] = piece;
-                list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+                /* check: pawn promotion */
+                if (piece == '1' && position / 8 == 0) {
+                    char promotionOptions[4] = {'2', '3', '4', '5'};
+                    boardCopy[position + 1] = '0';
+                    for (int32_t i = 0; i < 4; i++) {
+                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[i];
+                        list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                        list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
+                        list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+                    }
+                } else if (piece == 'A' && position / 8 == 7) {
+                    char promotionOptions[4] = {'B', 'C', 'D', 'E'};
+                    boardCopy[position + 1] = '0';
+                    for (int32_t i = 0; i < 4; i++) {
+                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[i];
+                        list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                        list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
+                        list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+                    }
+                } else {
+                    /* simulate piece moving */
+                    boardCopy[position + 1] = '0';
+                    boardCopy[self.dotSquares -> data[i].c + 1] = piece;
+                    list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                    list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
+                    list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+                }
             }
         }
     }
-    list_clear(self.dotSquares);
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
     for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         for (int32_t position = 0; position < 64; position++) {
             generateLegalMoves(self.moves -> data[movesIndex + MOVES_STRING].s + 1, position, !self.turn);
-
+            for (int32_t i = 0; i < self.dotSquares -> length; i++) {
+                char capturedPiece = self.moves -> data[movesIndex + MOVES_STRING].s[self.dotSquares -> data[i].c + 1];
+                if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') {
+                    /* this moves captures the king, invalidate the legal move */
+                    for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
+                        list_delete(self.moves, movesIndex);
+                    }
+                    movesIndex -= MOVES_NUMBER_OF_FIELDS;
+                    break;
+                }
+            }
         }
     }
+    list_clear(self.dotSquares);
     printf("Number of moves: %d\n", self.moves -> length / MOVES_NUMBER_OF_FIELDS);
     FILE *fp = fopen(filename, "wb");
     if (fp == NULL) {
