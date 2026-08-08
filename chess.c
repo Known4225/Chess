@@ -129,7 +129,7 @@ void init() {
 
     /* chess */
     self.turn = CHESS_WHITE;
-    memcpy(self.board, "BCDEFDCBAAAAAAAA000000000000000000000000000000001111111123456432", 64);
+    memcpy(self.board, "HCDEIDCHAAAAAAAA000000000000000000000000000000001111111183459438", 64);
     self.mouseSquare = -1;
     self.mousePiece = -1;
     self.highlightedSquare[0] = -1;
