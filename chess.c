@@ -203,8 +203,10 @@ int32_t export(char *filename) {
 turtle_texture_t getPieceTexture(char code) {
     switch (code) {
         case '1':
+        case '7':
         return self.pieces[0];
         case '2':
+        case '8':
         return self.pieces[1];
         case '3':
         return self.pieces[2];
@@ -213,10 +215,13 @@ turtle_texture_t getPieceTexture(char code) {
         case '5':
         return self.pieces[4];
         case '6':
+        case '9':
         return self.pieces[5];
         case 'A':
+        case 'G':
         return self.pieces[6];
         case 'B':
+        case 'H':
         return self.pieces[7];
         case 'C':
         return self.pieces[8];
@@ -225,6 +230,7 @@ turtle_texture_t getPieceTexture(char code) {
         case 'E':
         return self.pieces[10];
         case 'F':
+        case 'I':
         return self.pieces[11];
         default:
         return -1;
@@ -234,13 +240,17 @@ turtle_texture_t getPieceTexture(char code) {
 chess_piece_t getPieceType(char code) {
     switch (code) {
         case '1':
+        case '7':
         case 'A':
+        case 'G':
         return CHESS_PIECE_PAWN;
         case '2':
         case 'B':
         return CHESS_PIECE_ROOK;
         case '3':
+        case '8':
         case 'C':
+        case 'H':
         return CHESS_PIECE_KNIGHT;
         case '4':
         case 'D':
@@ -249,7 +259,9 @@ chess_piece_t getPieceType(char code) {
         case 'E':
         return CHESS_PIECE_QUEEN;
         case '6':
+        case '9':
         case 'F':
+        case 'I':
         return CHESS_PIECE_KING;
         default:
         return -1;
@@ -264,6 +276,9 @@ chess_color_t getPieceColor(char code) {
         case '4':
         case '5':
         case '6':
+        case '7':
+        case '8':
+        case '9':
         return CHESS_WHITE;
         case 'A':
         case 'B':
@@ -271,6 +286,9 @@ chess_color_t getPieceColor(char code) {
         case 'D':
         case 'E':
         case 'F':
+        case 'G':
+        case 'H':
+        case 'I':
         return CHESS_BLACK;
         default:
         return -1;
@@ -324,7 +342,7 @@ void render() {
             turtleTextWriteStringf(xpos - shift * 0.85, ypos + shift * 0.66, shift * 0.32, 0, "%d", 8 - i / 8);
         }
         if (i > 55) {
-            /* draw number */
+            /* draw letter */
             if (color) {
                 setColor(CHESS_COLOR_BLACK_SQUARE);
             } else {
@@ -523,10 +541,13 @@ void generateLegalMoves(int8_t position) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
             int8_t checkPosition = direction[j + 1](wanderingPosition);
-            if (checkPosition != -1 && (self.board[wanderingPosition] == '0')) {
-                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+            if (checkPosition != -1 && (self.board[checkPosition] == '0')) {
+                list_append(self.dotSquares, (unitype) checkPosition, 'c');
             }
             checkPosition = direction[j + 2](wanderingPosition);
+            if (checkPosition != -1 && (self.board[checkPosition] == '0')) {
+                list_append(self.dotSquares, (unitype) checkPosition, 'c');
+            }
         }
     } else if (type == CHESS_PIECE_BISHOP) {
         int8_t (*direction[4]) (int8_t position) = {
