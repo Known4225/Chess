@@ -538,21 +538,21 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 }
             }
         }
-        /* check for capture */
+        /* check for capture (and en passant) */
         wanderingPosition = direction[1](position);
+        int8_t enpassantPosition = left(position);
         if (wanderingPosition != -1) {
-            if (board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) {
+            if ((board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == '0' && (board[enpassantPosition] == '7' || board[enpassantPosition] == 'G'))) {
                 list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
         wanderingPosition = direction[2](position);
+        enpassantPosition = right(position);
         if (wanderingPosition != -1) {
-            if (board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) {
+            if ((board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == '0' && (board[enpassantPosition] == '7' || board[enpassantPosition] == 'G'))) {
                 list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
-        /* TODO - en passant */
-
         /* Note: pawn promotion handled in generateAllMoves */
     } else if (type == CHESS_PIECE_ROOK) {
         int8_t (*direction[4]) (int8_t position) = {
@@ -714,6 +714,18 @@ void generateAllMoves(char *filename) {
                     /* simulate piece moving */
                     boardCopy[position + 1] = '0';
                     boardCopy[self.dotSquares -> data[i].c + 1] = piece;
+                    /* check en passant */
+                    if (piece == '1') {
+                        int8_t enpassant = down(self.dotSquares -> data[i].c);
+                        if (enpassant != -1 && self.board[enpassant] == 'G') {
+                            boardCopy[enpassant + 1] = '0';
+                        }
+                    } else if (piece == 'b') {
+                        int8_t enpassant = up(self.dotSquares -> data[i].c);
+                        if (enpassant != -1 && self.board[enpassant] == '7') {
+                            boardCopy[enpassant + 1] = '0';
+                        }
+                    }
                     list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
                     list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
                     list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
