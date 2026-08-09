@@ -739,12 +739,18 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 /* white right castle */
                 boardCopy[63 + 1] = '2'; // revert rook
                 boardCopy[62 + 1] = '0'; // revert king
+                boardCopy[60 + 1] = '6'; // king walk
+                list_append(extraChecks, (unitype) boardCopy, 's');
+                boardCopy[60 + 1] = '0'; // revert king
                 boardCopy[61 + 1] = '6'; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             } else {
                 /* white left castle */
                 boardCopy[56 + 1] = '2'; // revert rook
                 boardCopy[57 + 1] = '0'; // revert king
+                boardCopy[60 + 1] = '6'; // king walk
+                list_append(extraChecks, (unitype) boardCopy, 's');
+                boardCopy[60 + 1] = '0'; // revert king
                 boardCopy[59 + 1] = '6'; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
                 boardCopy[59 + 1] = '0'; // revert king
@@ -761,12 +767,18 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 /* black right castle */
                 boardCopy[7 + 1] = '2'; // revert rook
                 boardCopy[6 + 1] = '0'; // revert king
+                boardCopy[4 + 1] = '6'; // king walk
+                list_append(extraChecks, (unitype) boardCopy, 's');
+                boardCopy[4 + 1] = '0'; // revert king
                 boardCopy[5 + 1] = '6'; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             } else {
                 /* black left castle */
                 boardCopy[0 + 1] = '2'; // revert rook
                 boardCopy[1 + 1] = '0'; // revert king
+                boardCopy[4 + 1] = '6'; // king walk
+                list_append(extraChecks, (unitype) boardCopy, 's');
+                boardCopy[4 + 1] = '0'; // revert king
                 boardCopy[3 + 1] = '6'; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
                 boardCopy[3 + 1] = '0'; // revert king
