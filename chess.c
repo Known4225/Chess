@@ -622,11 +622,11 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
             int8_t checkPosition = direction[j + 1](wanderingPosition);
-            if (checkPosition != -1 && (board[checkPosition] == '0')) {
+            if (checkPosition != -1 && (board[checkPosition] == '0' || getPieceColor(board[checkPosition]) != color)) {
                 list_append(self.dotSquares, (unitype) checkPosition, 'c');
             }
             checkPosition = direction[j + 2](wanderingPosition);
-            if (checkPosition != -1 && (board[checkPosition] == '0')) {
+            if (checkPosition != -1 && (board[checkPosition] == '0' || getPieceColor(board[checkPosition]) != color)) {
                 list_append(self.dotSquares, (unitype) checkPosition, 'c');
             }
         }
@@ -679,10 +679,8 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         for (int32_t j = 0; j < 8; j++) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
-            if (wanderingPosition != -1) {
-                if (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color) {
-                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
-                }
+            if (wanderingPosition != -1 && (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color)) {
+                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
         /* castling */
@@ -809,8 +807,11 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
             generateNaiveMoves(self.moves -> data[movesIndex + MOVES_STRING].s + 1, positionIndex, !self.turn);
             for (int32_t i = 0; i < self.dotSquares -> length; i++) {
                 char capturedPiece = self.moves -> data[movesIndex + MOVES_STRING].s[self.dotSquares -> data[i].c + 1];
-                if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') { // TODO - make distinction between black and white and dependent on turn
+                if ((self.turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (self.turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
                     /* this moves captures the king, invalidate the legal move */
+                    // printf("invalidate due to %d to %d\n", positionIndex, self.dotSquares -> data[i].c);
+                    // printDotSquares();
+                    // printBoard(self.moves -> data[movesIndex + MOVES_STRING].s + 1);
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                         list_delete(self.moves, movesIndex);
                     }
@@ -826,7 +827,7 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                     generateNaiveMoves(self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, positionIndex, !self.turn);
                     for (int32_t i = 0; i < self.dotSquares -> length; i++) {
                         char capturedPiece = self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[self.dotSquares -> data[i].c + 1];
-                        if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') {
+                        if ((self.turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (self.turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
                             /* this moves captures the king, invalidate the legal move */
                             for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                                 list_delete(self.moves, movesIndex);
