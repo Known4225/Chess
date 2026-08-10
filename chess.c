@@ -23,10 +23,8 @@ H - black rook that hasn't moved               (0x48)
 I - black king that hasn't moved               (0x49)
 
 TODO:
-- Make it so you cannot castle out of check
-- Generate legal moves
-  - Challenges: en passant, castling, cannot make move that results in check
 - Implement bot API
+- Formal notion of checkmate
 */
 
 #include "turtle.h"
