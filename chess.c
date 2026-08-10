@@ -239,11 +239,21 @@ int32_t export(char *filename) {
 
 }
 
-void printBoard() {
-    for (int32_t i = 0; i < 64; i++) {
-        printf("%c", self.board[i]);
+void printBoard(char *board) {
+    for (int32_t j = 0; j < 8; j++) {
+        for (int32_t i = 0; i < 8; i++) {
+            printf("%c", board[j * 8 + i]);
+        }
+        printf("\n");
     }
-    printf("\n");
+}
+
+void printDotSquares() {
+    printf("self.dotSquares = [");
+    for (int32_t i = 0; i < self.dotSquares -> length; i++) {
+        printf("%d ", self.dotSquares -> data[i].c);
+    }
+    printf("]\n");
 }
 
 /* get piece texture given board code */
@@ -522,6 +532,7 @@ static inline int8_t downRight(int8_t position) {
 
 /* naive generation - does not cull moves that would put the king in check, returns moves in self.dotSquares */
 void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
+    list_clear(self.dotSquares);
     if (position == -1) {
         return;
     }
@@ -533,7 +544,6 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
     if (color != turn) {
         return;
     }
-    list_clear(self.dotSquares);
     if (type == CHESS_PIECE_PAWN) {
         /* pawn */
         int8_t (*direction[3]) (int8_t position);
@@ -803,7 +813,6 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 char capturedPiece = self.moves -> data[movesIndex + MOVES_STRING].s[self.dotSquares -> data[i].c + 1];
                 if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') { // TODO - make distinction between black and white and dependent on turn
                     /* this moves captures the king, invalidate the legal move */
-                    printf("invalidated due to %d to %d (captured piece %c)\n", positionIndex, self.dotSquares -> data[i].c, capturedPiece);
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                         list_delete(self.moves, movesIndex);
                     }
@@ -1127,7 +1136,7 @@ void mouse() {
     if (turtleKeyPressed(GLFW_KEY_SPACE)) {
         if (self.keys[KEYS_SPACE] == 0) {
             self.keys[KEYS_SPACE] = 1;
-            printBoard();
+            printBoard(self.board);
         }
     } else {
         self.keys[KEYS_SPACE] = 0;
