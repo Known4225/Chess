@@ -75,6 +75,7 @@ int main(int argc, char *argv[]) {
     // list_print(self.moves);
     if (self.moves -> length < 2) {
         ERROR_PRINT("No moves available\n");
+        return -1;
     }
     memcpy(self.board, self.moves -> data[0].s + 1, 64);
     if (self.moves -> data[0].s[0] == 'w') {
