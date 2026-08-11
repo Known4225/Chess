@@ -469,6 +469,49 @@ void render() {
     if (self.ryan -> value) {
         self.ryan -> value = 0;
         generateAllMoves(self.inputFilename);
+        char *command = malloc(8192);
+        // sprintf(command, "\"%sryan.exe\"", osToolsFileDialog.executableFilepath);
+        sprintf(command, "\"\"%sryan.exe\" \"%s\" \"%s\"\"", osToolsFileDialog.executableFilepath, self.inputFilename, self.outputFilename); // idk why it needs to be double quoted
+        // printf("%s\n", command);
+        int32_t status = system(command);
+        free(command);
+        if (status != 0) {
+            printf("ERROR: ryan.exe returned error code %d\n", status);
+            return;
+        }
+        /* check board */
+        FILE *fp = fopen(self.outputFilename, "r");
+        if (fp == NULL) {
+            printf("ERROR: Could not open file %s\n", self.outputFilename);
+            return;
+        }
+        char line[1024];
+        fgets(line, 1024, fp);
+        fclose(fp);
+        for (int32_t i = 0; i < 2; i++) {
+            if (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r') {
+                line[strlen(line) - 1] = '\0';
+            }
+        }
+        int32_t found = -1;
+        for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+            if (strcmp(self.moves -> data[movesIndex + MOVES_STRING].s, line) == 0) {
+                found = movesIndex;
+                break;
+            }
+        }
+        if (found == -1) {
+            printf("ERROR: ryan.exe output (%s) is invalid\n", line);
+            return;
+        }
+        /* make move */
+        movePiece(self.board, self.moves -> data[found + MOVES_FROM].c, self.moves -> data[found + MOVES_TO].c);
+        list_clear(self.dotSquares);
+        self.highlightedSquare[1] = self.moves -> data[found + MOVES_FROM].c;
+        self.highlightedSquare[2] = self.moves -> data[found + MOVES_TO].c;
+        self.highlightedSquare[0] = -1;
+        self.mousePiece = -1;
+        self.turn = !self.turn;
     }
 }
 
@@ -798,7 +841,7 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
             list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
             list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
         } else {
-            printf("ERROR - movePiece returned MOVE_PIECE_ERROR\n");
+            printf("ERROR: movePiece returned MOVE_PIECE_ERROR\n");
         }
     }
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
@@ -1017,7 +1060,7 @@ void generateAllMoves(char *filename) {
                     list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
                     list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                 } else {
-                    printf("ERROR - movePiece returned MOVE_PIECE_ERROR\n");
+                    printf("ERROR: movePiece returned MOVE_PIECE_ERROR\n");
                 }
             }
         }
