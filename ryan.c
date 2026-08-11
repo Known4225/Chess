@@ -15,7 +15,8 @@ Strategies:
 
 typedef enum {
     ENGINE_STRATEGY_RANDOM = 1,
-    ENGINE_STRATEGY_MINIMISE_OPPONENT = 2,
+    ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES = 2,
+    ENGINE_STRATEGY_MAXIMISE_MOVES = 3,
 } engine_strategy_t;
 
 typedef enum {
@@ -25,7 +26,8 @@ typedef enum {
 
 /* returns an index of moves, returns -1 if error */
 int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves);
-int32_t engineStrategyMinimiseOpponent(char *board, chess_color_t turn, list_t *moves);
+int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves);
+int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves);
 
 typedef struct {
     /* strategy */
@@ -88,8 +90,10 @@ int main(int argc, char *argv[]) {
     int32_t status = 0;
     if (self.strategy == ENGINE_STRATEGY_RANDOM) {
         status = engineStrategyRandom(self.board, self.turn, self.moves);
-    } else if (self.strategy == ENGINE_STRATEGY_MINIMISE_OPPONENT) {
-        status = engineStrategyMinimiseOpponent(self.board, self.turn, self.moves);
+    } else if (self.strategy == ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES) {
+        status = engineStrategyMinimiseOpponentMoves(self.board, self.turn, self.moves);
+    } else if (self.strategy == ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES) {
+        status = engineStrategyMaximiseMoves(self.board, self.turn, self.moves);
     } else {
         ERROR_PRINT("Unknown strategy %d\n", self.strategy);
         return -1;
@@ -113,6 +117,10 @@ int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves) {
     return randomInt(0, moves -> length - 1);
 }
 
-int32_t engineStrategyMinimiseOpponent(char *board, chess_color_t turn, list_t *moves) {
+int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves) {
+
+}
+
+int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves) {
 
 }

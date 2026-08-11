@@ -23,8 +23,9 @@ H - black rook that hasn't moved               (0x48)
 I - black king that hasn't moved               (0x49)
 
 TODO:
+- Pawn promotion
 - Implement bot API
-- Formal notion of checkmate
+- Formal notion of checkmate & stalemate
 */
 
 #include "turtle.h"
