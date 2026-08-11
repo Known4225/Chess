@@ -61,7 +61,8 @@ enum {
     CHESS_COLOR_WHITE_SQUARE_HIGHLIGHT_BOX = 4,
     CHESS_COLOR_BLACK_SQUARE_HIGHLIGHT_BOX = 5,
     CHESS_COLOR_SQUARE_DOT = 6,
-    CHESS_COLOR_NUMBER = 7,
+    CHESS_COLOR_PAWN_PROMOTION = 7,
+    CHESS_COLOR_NUMBER = 8,
 };
 
 enum {
@@ -94,6 +95,7 @@ uint8_t colors[] = {
     252, 252, 211, 0,   // box highlight white square
     206, 218, 195, 0,   // box highlight black square
     60, 60, 60, 200,    // white square dot
+    255, 255, 255, 0,   // pawn promotion
 
     234, 237, 209, 0,   // white square
     118, 149, 86, 0,    // black square
@@ -102,6 +104,7 @@ uint8_t colors[] = {
     252, 252, 211, 0,   // box highlight white square
     206, 218, 195, 0,   // box highlight black square
     60, 60, 60, 200,    // white square dot
+    255, 255, 255, 0,   // pawn promotion
 };
 
 typedef struct {
@@ -118,8 +121,9 @@ typedef struct {
     int8_t highlightedSquareBox; // selected with color CHESS_COLOR_X_SQUARE_HIGHLIGHT_BOX
     int8_t highlightUnselect;
     list_t *dotSquares; // list of squares marked with a dot (for valid)
-    int8_t whiteCastleEligible;
-    int8_t blackCastleEligible;
+    int8_t pawnPromotionWhite;
+    int8_t pawnPromotionBlack;
+    int8_t pawnPromotionIndex;
 
     /* board */
     double boardX;
@@ -149,8 +153,9 @@ void init() {
     self.highlightedSquare[2] = -1;
     self.highlightedSquareBox = -1;
     self.highlightUnselect = 0;
-    self.whiteCastleEligible = 1;
-    self.blackCastleEligible = 1;
+    self.pawnPromotionWhite = -1;
+    self.pawnPromotionBlack = -1;
+    self.pawnPromotionIndex = -1;
     self.dotSquares = list_init();
 
     /* textures */
@@ -461,6 +466,49 @@ void render() {
         tt_setColor(TT_COLOR_BLACK);
         turtleTextWriteString("Turn: Black", self.boardX + self.boardSize + 10, self.boardY, 10, 0);
     }
+    /* render pawn promotion */
+    if (self.pawnPromotionWhite != -1) {
+        self.pawnPromotionIndex = -1;
+        xpos = self.boardX - self.boardSize + shift + self.pawnPromotionWhite % 8 * shift * 2;
+        ypos = self.boardY + self.boardSize - shift - self.pawnPromotionWhite / 8 * shift * 2;
+        char promotionOptions[4] = {'5', '3', '2', '4'};
+        tt_setColor(TT_COLOR_BACKGROUND);
+        turtleRectangle(xpos - shift * 1.05, ypos - shift * 7.05, xpos + shift * 1.05, ypos + shift * 1.05); // simulate drop shadow
+        setColor(CHESS_COLOR_PAWN_PROMOTION);
+        turtleRectangle(xpos - shift, ypos - shift * 7, xpos + shift, ypos + shift);
+        for (int32_t j = 0; j < 4; j++) {
+            turtle_texture_t texture = getPieceTexture(promotionOptions[j]);
+            turtleTexture(texture, xpos - shift, ypos - shift, xpos + shift, ypos + shift, 0);
+            if (turtle.mouseX > xpos - shift && turtle.mouseX <= xpos + shift && turtle.mouseY > ypos - shift && turtle.mouseY <= ypos + shift) {
+                self.pawnPromotionIndex = j;
+            }
+            ypos -= shift * 2;
+        }
+    } else if (self.pawnPromotionBlack != -1) {
+        self.pawnPromotionIndex = -1;
+        xpos = self.boardX - self.boardSize + shift + self.pawnPromotionBlack % 8 * shift * 2;
+        ypos = self.boardY + self.boardSize - shift - self.pawnPromotionBlack / 8 * shift * 2;
+        char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+        tt_setColor(TT_COLOR_BACKGROUND);
+        turtleRectangle(xpos - shift * 1.05, ypos - shift * 1.05, xpos + shift * 1.05, ypos + shift * 7.05); // simulate drop shadow
+        setColor(CHESS_COLOR_PAWN_PROMOTION);
+        turtleRectangle(xpos - shift, ypos - shift, xpos + shift, ypos + shift * 7);
+        for (int32_t j = 0; j < 4; j++) {
+            turtle_texture_t texture = getPieceTexture(promotionOptions[j]);
+            turtleTexture(texture, xpos - shift, ypos - shift, xpos + shift, ypos + shift, 0);
+            if (turtle.mouseX > xpos - shift && turtle.mouseX <= xpos + shift && turtle.mouseY > ypos - shift && turtle.mouseY <= ypos + shift) {
+                self.pawnPromotionIndex = j;
+            }
+            ypos += shift * 2;
+        }
+    }
+    if (self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) {
+        self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
+    } else {
+        self.mohamed -> enabled = TT_ELEMENT_ENABLED;
+        self.ryan -> enabled = TT_ELEMENT_ENABLED;
+    }
 
     /* engine buttons */
     if (self.mohamed -> value) {
@@ -636,7 +684,7 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                 list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
             }
         }
-        /* Note: pawn promotion handled in generateAllMoves */
+        /* Note: pawn promotion handled in movePiece */
     } else if (type == CHESS_PIECE_ROOK) {
         int8_t (*direction[4]) (int8_t position) = {
             up, right, down, left,
@@ -763,18 +811,18 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
         int32_t move = movePiece(boardCopy + 1, position, self.dotSquares -> data[i].c);
         /* check results */
         if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-            char promotionOptions[4] = {'2', '3', '4', '5'};
-            for (int32_t i = 0; i < 4; i++) {
-                boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[i];
+            char promotionOptions[4] = {'5', '3', '2', '4'};
+            for (int32_t j = 0; j < 4; j++) {
+                boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
                 list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
                 list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
                 list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
                 list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
             }
         } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-            char promotionOptions[4] = {'B', 'C', 'D', 'E'};
-            for (int32_t i = 0; i < 4; i++) {
-                boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[i];
+            char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+            for (int32_t j = 0; j < 4; j++) {
+                boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
                 list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
                 list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
                 list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
@@ -924,13 +972,11 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
         piece = 'F';
     }
     /* check: pawn promotion */
-    if (piece == '1' && positionFrom / 8 == 0) {
-        char promotionOptions[4] = {'2', '3', '4', '5'};
-        board[positionFrom + 1] = '0';
+    if (piece == '1' && positionTo / 8 == 0) {
+        board[positionFrom] = '0';
         board[positionTo] = piece;
         return MOVE_PIECE_PAWN_PROMOTION_WHITE;
-    } else if (piece == 'A' && positionFrom / 8 == 7) {
-        char promotionOptions[4] = {'B', 'C', 'D', 'E'};
+    } else if (piece == 'A' && positionTo / 8 == 7) {
         board[positionFrom] = '0';
         board[positionTo] = piece;
         return MOVE_PIECE_PAWN_PROMOTION_BLACK;
@@ -994,18 +1040,18 @@ void generateAllMoves(char *filename) {
                 int32_t move = movePiece(boardCopy + 1, position, self.dotSquares -> data[i].c);
                 /* check results */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-                    char promotionOptions[4] = {'2', '3', '4', '5'};
-                    for (int32_t i = 0; i < 4; i++) {
-                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[i];
+                    char promotionOptions[4] = {'5', '3', '2', '4'};
+                    for (int32_t j = 0; j < 4; j++) {
+                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
                         list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
                         list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
                         list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
                         list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                     }
                 } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-                    char promotionOptions[4] = {'B', 'C', 'D', 'E'};
-                    for (int32_t i = 0; i < 4; i++) {
-                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[i];
+                    char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+                    for (int32_t j = 0; j < 4; j++) {
+                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
                         list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
                         list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
                         list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
@@ -1125,20 +1171,43 @@ void generateAllMoves(char *filename) {
 }
 
 void mouse() {
+    if (self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) {
+        self.mouseSquare = -1;           
+    }
     if (turtleMouseDown()) {
         if (self.keys[KEYS_LMB] == 0) {
             /* first tick */
             self.keys[KEYS_LMB] = 1;
+            if ((self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) && self.pawnPromotionIndex != -1) {
+                if (self.pawnPromotionWhite != -1) {
+                    char promotionOptions[4] = {'5', '3', '2', '4'};
+                    self.board[self.pawnPromotionWhite] = promotionOptions[self.pawnPromotionIndex];
+                    self.pawnPromotionWhite = -1;
+                } else {
+                    char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+                    self.board[self.pawnPromotionBlack] = promotionOptions[self.pawnPromotionIndex];
+                    self.pawnPromotionBlack = -1;
+                }
+                self.turn = !self.turn;
+                return;
+            }
             self.mousePiece = self.mouseSquare;
             if (self.mousePiece != -1 && list_find(self.dotSquares, (unitype) self.mousePiece, 'c') >= 0) {
                 /* make move */
-                movePiece(self.board, self.highlightedSquare[0], self.mousePiece);
+                int32_t status = movePiece(self.board, self.highlightedSquare[0], self.mousePiece);
+                if (status == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
+                    /* special: pawn promotion */
+                    self.pawnPromotionWhite = self.mousePiece;
+                } else if (status == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                    self.pawnPromotionBlack = self.mousePiece;
+                } else {
+                    self.turn = !self.turn;
+                }
                 list_clear(self.dotSquares);
                 self.highlightedSquare[1] = self.highlightedSquare[0];
                 self.highlightedSquare[2] = self.mousePiece;
                 self.highlightedSquare[0] = -1;
                 self.mousePiece = -1;
-                self.turn = !self.turn;
             } else if (self.mousePiece == -1 || self.board[self.mousePiece] == '0') {
                 list_clear(self.dotSquares);
                 self.highlightedSquare[0] = -1;
@@ -1161,12 +1230,19 @@ void mouse() {
             self.keys[KEYS_LMB] = 0;
             if (self.mousePiece == self.highlightedSquare[0] && list_find(self.dotSquares, (unitype) self.mouseSquare, 'c') >= 0) {
                 /* make move */
-                movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
+                int32_t status = movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
+                if (status == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
+                    /* special: pawn promotion */
+                    self.pawnPromotionWhite = self.mouseSquare;
+                } else if (status == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                    self.pawnPromotionBlack = self.mouseSquare;
+                } else {
+                    self.turn = !self.turn;
+                }
                 list_clear(self.dotSquares);
                 self.highlightedSquare[1] = self.highlightedSquare[0];
                 self.highlightedSquare[2] = self.mouseSquare;
                 self.highlightedSquare[0] = -1;
-                self.turn = !self.turn;
             } else if (self.mouseSquare == self.mousePiece && self.highlightUnselect) {
                 list_clear(self.dotSquares);
                 self.highlightedSquare[0] = -1;
@@ -1203,8 +1279,9 @@ void parseRibbonOutput() {
             self.highlightedSquare[2] = -1;
             self.highlightedSquareBox = -1;
             self.highlightUnselect = 0;
-            self.whiteCastleEligible = 1;
-            self.blackCastleEligible = 1;
+            self.pawnPromotionWhite = -1;
+            self.pawnPromotionBlack = -1;
+            self.pawnPromotionIndex = -1;
             list_clear(self.dotSquares);
         }
         if (tt_ribbon.output[2] == 2) { // Save
