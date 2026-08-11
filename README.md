@@ -6,8 +6,10 @@ Piece images sourced from chess.com
 
 
 # Funny Rules
-
+- Pawn promotion
 - En passant can only be done in the very next turn
 - Cannot castle out of or THROUGH check
 - Ensure that moves are crossed off if they result in a check
 - Castle only highlights king (and can only be done via king)
+- 50 moves without capture triggers draw
+- Moving back and forth 3 times triggers draw

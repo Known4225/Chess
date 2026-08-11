@@ -554,7 +554,11 @@ void render() {
             return;
         }
         /* make move */
-        movePiece(self.board, self.moves -> data[found + MOVES_FROM].c, self.moves -> data[found + MOVES_TO].c);
+        int32_t move = movePiece(self.board, self.moves -> data[found + MOVES_FROM].c, self.moves -> data[found + MOVES_TO].c);
+        /* check for pawn promotion */
+        if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE || move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+            self.board[self.moves -> data[found + MOVES_TO].c] = line[self.moves -> data[found + MOVES_TO].c + 1];
+        }
         list_clear(self.dotSquares);
         self.highlightedSquare[1] = self.moves -> data[found + MOVES_FROM].c;
         self.highlightedSquare[2] = self.moves -> data[found + MOVES_TO].c;
@@ -1040,6 +1044,7 @@ void generateAllMoves(char *filename) {
                 int32_t move = movePiece(boardCopy + 1, position, self.dotSquares -> data[i].c);
                 /* check results */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
+                    printf("generateAllMoves: MOVE_PIECE_PAWN_PROMOTION_WHITE\n");
                     char promotionOptions[4] = {'5', '3', '2', '4'};
                     for (int32_t j = 0; j < 4; j++) {
                         boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
@@ -1049,6 +1054,7 @@ void generateAllMoves(char *filename) {
                         list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                     }
                 } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                    printf("generateAllMoves: MOVE_PIECE_PAWN_PROMOTION_BLACK\n");
                     char promotionOptions[4] = {'E', 'C', 'B', 'D'};
                     for (int32_t j = 0; j < 4; j++) {
                         boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
@@ -1194,11 +1200,11 @@ void mouse() {
             self.mousePiece = self.mouseSquare;
             if (self.mousePiece != -1 && list_find(self.dotSquares, (unitype) self.mousePiece, 'c') >= 0) {
                 /* make move */
-                int32_t status = movePiece(self.board, self.highlightedSquare[0], self.mousePiece);
-                if (status == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-                    /* special: pawn promotion */
+                int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mousePiece);
+                /* check for pawn promotion */
+                if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
                     self.pawnPromotionWhite = self.mousePiece;
-                } else if (status == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
                     self.pawnPromotionBlack = self.mousePiece;
                 } else {
                     self.turn = !self.turn;
@@ -1230,11 +1236,11 @@ void mouse() {
             self.keys[KEYS_LMB] = 0;
             if (self.mousePiece == self.highlightedSquare[0] && list_find(self.dotSquares, (unitype) self.mouseSquare, 'c') >= 0) {
                 /* make move */
-                int32_t status = movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
-                if (status == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-                    /* special: pawn promotion */
+                int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
+                /* special: pawn promotion */
+                if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
                     self.pawnPromotionWhite = self.mouseSquare;
-                } else if (status == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
                     self.pawnPromotionBlack = self.mouseSquare;
                 } else {
                     self.turn = !self.turn;
