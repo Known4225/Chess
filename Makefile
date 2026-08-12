@@ -15,13 +15,15 @@ winlib:
 	gcc turtlelib.c -c -DTURTLE_IMPLEMENTATION -DTURTLE_ENABLE_TEXTURES -DOS_WINDOWS -O3 -o Windows/turtle.lib
 	rm turtlelib.c
 html:
-	emcc chess.c --shell-file config/chess_shell.html -sUSE_GLFW=3 -sMAX_WEBGL_VERSION=2 -sASYNCIFY -sINITIAL_MEMORY=1073741824 -sWASM=0 -DTURTLE_IMPLEMENTATION -DTURTLE_ENABLE_TEXTURES -DOS_BROWSER -Oz -o chess.html --embed-file images
+	emcc chess.c --shell-file config/chess_shell.html -sUSE_GLFW=3 -sMAX_WEBGL_VERSION=2 -sASYNCIFY -sINITIAL_MEMORY=1073741824 -sWASM=0 -DTURTLE_IMPLEMENTATION -DTURTLE_ENABLE_TEXTURES -DOS_BROWSER -Oz -o chess.html --embed-file pieces
 	gcc config/combine.c -o combine.exe
 	./combine.exe chess.html
 	rm combine.exe
 htmlserver:
-	emcc chess.c --shell-file config/chess_shell.html -sUSE_GLFW=3 -sMAX_WEBGL_VERSION=2 -sASYNCIFY -sINITIAL_MEMORY=1073741824 -DTURTLE_IMPLEMENTATION -DTURTLE_ENABLE_TEXTURES -DOS_BROWSER -O3 -o chess.html --embed-file images
+	emcc chess.c --shell-file config/chess_shell.html -sUSE_GLFW=3 -sMAX_WEBGL_VERSION=2 -sASYNCIFY -sINITIAL_MEMORY=1073741824 -DTURTLE_IMPLEMENTATION -DTURTLE_ENABLE_TEXTURES -DOS_BROWSER -O3 -o chess.html --embed-file pieces
 runserver:
 	emrun chess.html
 ryan:
 	gcc ryan.c -O3 -o ryan.exe
+mohamed:
+	gcc mohamed.c -O3 -o mohamed.exe

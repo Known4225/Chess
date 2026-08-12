@@ -240,12 +240,12 @@ void setColor(int32_t color) {
 
 /* import a file to board - TODO */
 int32_t import(char *filename) {
-
+    return -1;
 }
 
 /* export the board state - TODO */
 int32_t export(char *filename) {
-
+    return -1;
 }
 
 void printBoard(char *board) {
@@ -912,7 +912,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 }
             }
         }
-        SECOND_PASS_NEXT:
+        SECOND_PASS_NEXT:;
     }
     for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         list_append(output, moves -> data[movesIndex + MOVES_TO], 'c');
@@ -1136,7 +1136,7 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                 }
             }
         }
-        SECOND_PASS_NEXT:
+        SECOND_PASS_NEXT:;
     }
     printf("Number of moves: %d\n", moves -> length / MOVES_NUMBER_OF_FIELDS);
     return moves;
