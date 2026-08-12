@@ -814,7 +814,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
     boardCopy[65] = '\0';
     for (int32_t i = 0; i < naive -> length; i++) {
         if (turn == CHESS_WHITE) {
-            boardCopy[0] = BLACK_ROOK;
+            boardCopy[0] = 'b';
         } else {
             boardCopy[0] = 'w';
         }
@@ -1054,7 +1054,7 @@ list_t *generateAllMoves(char *board, int8_t turn) {
             boardCopy[65] = '\0';
             for (int32_t i = 0; i < naive -> length; i++) {
                 if (turn == CHESS_WHITE) {
-                    boardCopy[0] = BLACK_ROOK;
+                    boardCopy[0] = 'b';
                 } else {
                     boardCopy[0] = 'w';
                 }
@@ -1221,7 +1221,7 @@ int32_t engineMove(char *engineName) {
     }
     char turnChar = 'w';
     if (self.turn == CHESS_BLACK) {
-        turnChar = BLACK_ROOK;
+        turnChar = 'b';
     }
     fwrite(&turnChar, 1, 1, inputfp);
     fwrite(self.board, 1, 64, inputfp);
