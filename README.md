@@ -1,9 +1,12 @@
 # Chess
 
-Piece images sourced from chess.com
+- Piece images sourced from [chess.com](https://www.chess.com/)
+- Color scheme sourced from [chess.com](https://www.chess.com/)
+- UI behaviour copied from [chess.com](https://www.chess.com/)
 
 # How to use
 
+Play chess manually or make use of the custom engines by clicking the `Mohamed` or `Ryan` buttons which will use the engine to make a single move.
 
 # Funny Rules
 - Pawn promotion
