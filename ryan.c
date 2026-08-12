@@ -4,7 +4,6 @@ Created by Ryan Srichai 10.08.2026
 Strategies:
 - Random move
 - Minimise opponent moves
-
 */
 
 #define UNITYPE_LIST_IMPLEMENTATION
@@ -72,7 +71,6 @@ int main(int argc, char *argv[]) {
         list_append(self.moves, (unitype) line, 's');
     }
     fclose(inputfp);
-    // list_print(self.moves);
     if (self.moves -> length < 2) {
         ERROR_PRINT("No moves available\n");
         return -1;
@@ -93,7 +91,7 @@ int main(int argc, char *argv[]) {
         status = engineStrategyRandom(self.board, self.turn, self.moves);
     } else if (self.strategy == ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES) {
         status = engineStrategyMinimiseOpponentMoves(self.board, self.turn, self.moves);
-    } else if (self.strategy == ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES) {
+    } else if (self.strategy == ENGINE_STRATEGY_MAXIMISE_MOVES) {
         status = engineStrategyMaximiseMoves(self.board, self.turn, self.moves);
     } else {
         ERROR_PRINT("Unknown strategy %d\n", self.strategy);

@@ -23,9 +23,9 @@ H - black rook that hasn't moved               (0x48)
 I - black king that hasn't moved               (0x49)
 
 TODO:
-- Pawn promotion
-- Implement bot API
-- Formal notion of checkmate & stalemate
+- Implement special stalemate conditions:
+  - No capture in 50 moves
+  - Threefold repetition
 */
 
 #include "turtle.h"
@@ -36,6 +36,28 @@ TODO:
 
 int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo);
 int32_t engineMove(char *engineName);
+
+enum {
+    BLANK_SPACE = '0',
+    WHITE_PAWN = '1',
+    WHITE_ROOK = '2',
+    WHITE_KNIGHT = '3',
+    WHITE_BISHOP = '4',
+    WHITE_QUEEN = '5',
+    WHITE_KING = '6',
+    WHITE_PAWN_EN_PASSANT = '7',
+    WHITE_ROOK_NO_MOVE = '8',
+    WHITE_KING_NO_MOVE = '9',
+    BLACK_PAWN = 'A',
+    BLACK_ROOK = 'B',
+    BLACK_KNIGHT = 'C',
+    BLACK_BISHOP = 'D',
+    BLACK_QUEEN = 'E',
+    BLACK_KING = 'F',
+    BLACK_PAWN_EN_PASSANT = 'G',
+    BLACK_ROOK_NO_MOVE = 'H',
+    BLACK_KING_NO_MOVE = 'I',
+};
 
 typedef enum {
     CHESS_PIECE_PAWN = 0,
@@ -73,6 +95,7 @@ enum {
     KEYS_SPACE = 1,
 };
 
+/* MOVES_X format for lists */
 enum {
     MOVES_STRING = 0,
     MOVES_FROM = 1,
@@ -81,6 +104,7 @@ enum {
     MOVES_NUMBER_OF_FIELDS = 4,
 };
 
+/* return code for movePiece */
 enum {
     MOVE_PIECE_ERROR = -1,
     MOVE_PIECE_SUCCESSFUL = 0,
@@ -88,6 +112,14 @@ enum {
     MOVE_PIECE_PAWN_PROMOTION_BLACK = 2,
     MOVE_PIECE_CASTLE_WHITE = 3,
     MOVE_PIECE_CASTLE_BLACK = 4,
+};
+
+/* return code for checkBoardState */
+enum {
+    BOARD_STATE_NONE = 0,
+    BOARD_STATE_CHECK = 1,
+    BOARD_STATE_STALEMATE = 2,
+    BOARD_STATE_CHECKMATE = 3,
 };
 
 uint8_t colors[] = {
@@ -268,35 +300,35 @@ void printValid(list_t *valid) {
 /* get piece texture given board code */
 turtle_texture_t getPieceTexture(char code) {
     switch (code) {
-        case '1':
-        case '7':
+        case WHITE_PAWN:
+        case WHITE_PAWN_EN_PASSANT:
         return self.pieces[0];
-        case '2':
-        case '8':
+        case WHITE_ROOK:
+        case WHITE_ROOK_NO_MOVE:
         return self.pieces[1];
-        case '3':
+        case WHITE_KNIGHT:
         return self.pieces[2];
-        case '4':
+        case WHITE_BISHOP:
         return self.pieces[3];
-        case '5':
+        case WHITE_QUEEN:
         return self.pieces[4];
-        case '6':
-        case '9':
+        case WHITE_KING:
+        case WHITE_KING_NO_MOVE:
         return self.pieces[5];
-        case 'A':
-        case 'G':
+        case BLACK_PAWN:
+        case BLACK_PAWN_EN_PASSANT:
         return self.pieces[6];
-        case 'B':
-        case 'H':
+        case BLACK_ROOK:
+        case BLACK_ROOK_NO_MOVE:
         return self.pieces[7];
-        case 'C':
+        case BLACK_KNIGHT:
         return self.pieces[8];
-        case 'D':
+        case BLACK_BISHOP:
         return self.pieces[9];
-        case 'E':
+        case BLACK_QUEEN:
         return self.pieces[10];
-        case 'F':
-        case 'I':
+        case BLACK_KING:
+        case BLACK_KING_NO_MOVE:
         return self.pieces[11];
         default:
         return -1;
@@ -305,29 +337,29 @@ turtle_texture_t getPieceTexture(char code) {
 
 chess_piece_t getPieceType(char code) {
     switch (code) {
-        case '1':
-        case '7':
-        case 'A':
-        case 'G':
+        case WHITE_PAWN:
+        case WHITE_PAWN_EN_PASSANT:
+        case BLACK_PAWN:
+        case BLACK_PAWN_EN_PASSANT:
         return CHESS_PIECE_PAWN;
-        case '2':
-        case '8':
-        case 'B':
-        case 'H':
+        case WHITE_ROOK:
+        case WHITE_ROOK_NO_MOVE:
+        case BLACK_ROOK:
+        case BLACK_ROOK_NO_MOVE:
         return CHESS_PIECE_ROOK;
-        case '3':
-        case 'C':
+        case WHITE_KNIGHT:
+        case BLACK_KNIGHT:
         return CHESS_PIECE_KNIGHT;
-        case '4':
-        case 'D':
+        case WHITE_BISHOP:
+        case BLACK_BISHOP:
         return CHESS_PIECE_BISHOP;
-        case '5':
-        case 'E':
+        case WHITE_QUEEN:
+        case BLACK_QUEEN:
         return CHESS_PIECE_QUEEN;
-        case '6':
-        case '9':
-        case 'F':
-        case 'I':
+        case WHITE_KING:
+        case WHITE_KING_NO_MOVE:
+        case BLACK_KING:
+        case BLACK_KING_NO_MOVE:
         return CHESS_PIECE_KING;
         default:
         return -1;
@@ -336,25 +368,25 @@ chess_piece_t getPieceType(char code) {
 
 chess_color_t getPieceColor(char code) {
     switch (code) {
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
+        case WHITE_PAWN:
+        case WHITE_ROOK:
+        case WHITE_KNIGHT:
+        case WHITE_BISHOP:
+        case WHITE_QUEEN:
+        case WHITE_KING:
+        case WHITE_PAWN_EN_PASSANT:
+        case WHITE_ROOK_NO_MOVE:
+        case WHITE_KING_NO_MOVE:
         return CHESS_WHITE;
-        case 'A':
-        case 'B':
-        case 'C':
-        case 'D':
-        case 'E':
-        case 'F':
-        case 'G':
-        case 'H':
-        case 'I':
+        case BLACK_PAWN:
+        case BLACK_ROOK:
+        case BLACK_KNIGHT:
+        case BLACK_BISHOP:
+        case BLACK_QUEEN:
+        case BLACK_KING:
+        case BLACK_PAWN_EN_PASSANT:
+        case BLACK_ROOK_NO_MOVE:
+        case BLACK_KING_NO_MOVE:
         return CHESS_BLACK;
         default:
         return -1;
@@ -414,7 +446,7 @@ void render() {
             } else {
                 setColor(CHESS_COLOR_WHITE_SQUARE);
             }
-            turtleTextWriteStringf(xpos + shift * 0.85, ypos - shift * 0.66, shift * 0.32, 100, "%c", 'a' + i % 8);
+            turtleTextWriteStringf(xpos + shift * 0.85, ypos - shift * 0.66, shift * 0.32, 100, "%c", BLACK_PAWN + i % 8);
         }
         color = !color;
         xpos += shift * 2;
@@ -429,7 +461,7 @@ void render() {
     ypos = self.boardY + self.boardSize - shift;
     MUTEX_ACQUIRE(self.boardMutex);
     for (int32_t i = 0; i < 64; i++) {
-        if (self.board[i] != '0') {
+        if (self.board[i] != BLANK_SPACE) {
             turtle_texture_t texture = getPieceTexture(self.board[i]);
             if (texture != -1 && self.mousePiece != i) {
                 turtleTexture(texture, xpos - shift, ypos - shift, xpos + shift, ypos + shift, 0);
@@ -438,7 +470,7 @@ void render() {
         MUTEX_ACQUIRE(self.validMutex);
         if (list_find(self.valid, (unitype) i, 'c') != -1) {
             setColor(CHESS_COLOR_SQUARE_DOT);
-            if (self.board[i] == '0') {
+            if (self.board[i] == BLANK_SPACE) {
                 turtleCircle(xpos, ypos, shift * 0.35);
             } else {
                 turtlePenShape("none");
@@ -480,7 +512,7 @@ void render() {
         self.pawnPromotionIndex = -1;
         xpos = self.boardX - self.boardSize + shift + self.pawnPromotionWhite % 8 * shift * 2;
         ypos = self.boardY + self.boardSize - shift - self.pawnPromotionWhite / 8 * shift * 2;
-        char promotionOptions[4] = {'5', '3', '2', '4'};
+        char promotionOptions[4] = {WHITE_QUEEN, WHITE_KNIGHT, WHITE_ROOK, WHITE_BISHOP};
         tt_setColor(TT_COLOR_BACKGROUND);
         turtleRectangle(xpos - shift * 1.05, ypos - shift * 7.05, xpos + shift * 1.05, ypos + shift * 1.05); // simulate drop shadow
         setColor(CHESS_COLOR_PAWN_PROMOTION);
@@ -497,7 +529,7 @@ void render() {
         self.pawnPromotionIndex = -1;
         xpos = self.boardX - self.boardSize + shift + self.pawnPromotionBlack % 8 * shift * 2;
         ypos = self.boardY + self.boardSize - shift - self.pawnPromotionBlack / 8 * shift * 2;
-        char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+        char promotionOptions[4] = {BLACK_QUEEN, BLACK_KNIGHT, BLACK_ROOK, BLACK_BISHOP};
         tt_setColor(TT_COLOR_BACKGROUND);
         turtleRectangle(xpos - shift * 1.05, ypos - shift * 1.05, xpos + shift * 1.05, ypos + shift * 7.05); // simulate drop shadow
         setColor(CHESS_COLOR_PAWN_PROMOTION);
@@ -630,7 +662,7 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         int8_t spaceEmpty = 0; // ensure that pawn cannot move twice if a piece is in the way
         int8_t wanderingPosition = direction[0](position);
         if (wanderingPosition != -1) {
-            if (board[wanderingPosition] == '0') {
+            if (board[wanderingPosition] == BLANK_SPACE) {
                 list_append(output, (unitype) wanderingPosition, 'c');
                 spaceEmpty = 1;
             }
@@ -639,7 +671,7 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         if (spaceEmpty && position / 8 == pawnPowerRow) {
             wanderingPosition = direction[0](wanderingPosition);
             if (wanderingPosition != -1) {
-                if (board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == BLANK_SPACE) {
                     list_append(output, (unitype) wanderingPosition, 'c');
                 }
             }
@@ -648,14 +680,14 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         wanderingPosition = direction[1](position);
         int8_t enpassantPosition = left(position);
         if (wanderingPosition != -1) {
-            if ((board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == '0' && getPieceColor(board[enpassantPosition]) != color && (board[enpassantPosition] == '7' || board[enpassantPosition] == 'G'))) {
+            if ((board[wanderingPosition] != BLANK_SPACE && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == BLANK_SPACE && getPieceColor(board[enpassantPosition]) != color && (board[enpassantPosition] == WHITE_PAWN_EN_PASSANT || board[enpassantPosition] == BLACK_PAWN_EN_PASSANT))) {
                 list_append(output, (unitype) wanderingPosition, 'c');
             }
         }
         wanderingPosition = direction[2](position);
         enpassantPosition = right(position);
         if (wanderingPosition != -1) {
-            if ((board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == '0' && getPieceColor(board[enpassantPosition]) != color && (board[enpassantPosition] == '7' || board[enpassantPosition] == 'G'))) {
+            if ((board[wanderingPosition] != BLANK_SPACE && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == BLANK_SPACE && getPieceColor(board[enpassantPosition]) != color && (board[enpassantPosition] == WHITE_PAWN_EN_PASSANT || board[enpassantPosition] == BLACK_PAWN_EN_PASSANT))) {
                 list_append(output, (unitype) wanderingPosition, 'c');
             }
         }
@@ -671,7 +703,7 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                 if (wanderingPosition == -1) {
                     break;
                 }
-                if (board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == BLANK_SPACE) {
                     list_append(output, (unitype) wanderingPosition, 'c');
                 } else {
                     if (getPieceColor(board[wanderingPosition]) != color) {
@@ -689,11 +721,11 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
             int8_t checkPosition = direction[j + 1](wanderingPosition);
-            if (checkPosition != -1 && (board[checkPosition] == '0' || getPieceColor(board[checkPosition]) != color)) {
+            if (checkPosition != -1 && (board[checkPosition] == BLANK_SPACE || getPieceColor(board[checkPosition]) != color)) {
                 list_append(output, (unitype) checkPosition, 'c');
             }
             checkPosition = direction[j + 2](wanderingPosition);
-            if (checkPosition != -1 && (board[checkPosition] == '0' || getPieceColor(board[checkPosition]) != color)) {
+            if (checkPosition != -1 && (board[checkPosition] == BLANK_SPACE || getPieceColor(board[checkPosition]) != color)) {
                 list_append(output, (unitype) checkPosition, 'c');
             }
         }
@@ -708,7 +740,7 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                 if (wanderingPosition == -1) {
                     break;
                 }
-                if (board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == BLANK_SPACE) {
                     list_append(output, (unitype) wanderingPosition, 'c');
                 } else {
                     if (getPieceColor(board[wanderingPosition]) != color) {
@@ -729,7 +761,7 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                 if (wanderingPosition == -1) {
                     break;
                 }
-                if (board[wanderingPosition] == '0') {
+                if (board[wanderingPosition] == BLANK_SPACE) {
                     list_append(output, (unitype) wanderingPosition, 'c');
                 } else {
                     if (getPieceColor(board[wanderingPosition]) != color) {
@@ -746,24 +778,24 @@ list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         for (int32_t j = 0; j < 8; j++) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
-            if (wanderingPosition != -1 && (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color)) {
+            if (wanderingPosition != -1 && (board[wanderingPosition] == BLANK_SPACE || getPieceColor(board[wanderingPosition]) != color)) {
                 list_append(output, (unitype) wanderingPosition, 'c');
             }
         }
         /* castling */
-        if (board[position] == '9' && board[63] == '8' && board[62] == '0' && board[61] == '0') {
+        if (board[position] == WHITE_KING_NO_MOVE && board[63] == WHITE_ROOK_NO_MOVE && board[62] == BLANK_SPACE && board[61] == BLANK_SPACE) {
             /* white right castle */
             list_append(output, (unitype) 62, 'c');
         }
-        if (board[position] == '9' && board[56] == '8' && board[57] == '0' && board[58] == '0' && board[59] == '0') {
+        if (board[position] == WHITE_KING_NO_MOVE && board[56] == WHITE_ROOK_NO_MOVE && board[57] == BLANK_SPACE && board[58] == BLANK_SPACE && board[59] == BLANK_SPACE) {
             /* white left castle */
             list_append(output, (unitype) 57, 'c');
         }
-        if (board[position] == 'I' && board[7] == 'H' && board[6] == '0' && board[5] == '0') {
+        if (board[position] == BLACK_KING_NO_MOVE && board[7] == BLACK_ROOK_NO_MOVE && board[6] == BLANK_SPACE && board[5] == BLANK_SPACE) {
             /* black right castle */
             list_append(output, (unitype) 6, 'c');
         }
-        if (board[position] == 'I' && board[0] == 'H' && board[1] == '0' && board[2] == '0' && board[3] == '0') {
+        if (board[position] == BLACK_KING_NO_MOVE && board[0] == BLACK_ROOK_NO_MOVE && board[1] == BLANK_SPACE && board[2] == BLANK_SPACE && board[3] == BLANK_SPACE) {
             /* black left castle */
             list_append(output, (unitype) 1, 'c');
         }
@@ -782,7 +814,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
     boardCopy[65] = '\0';
     for (int32_t i = 0; i < naive -> length; i++) {
         if (turn == CHESS_WHITE) {
-            boardCopy[0] = 'b';
+            boardCopy[0] = BLACK_ROOK;
         } else {
             boardCopy[0] = 'w';
         }
@@ -790,7 +822,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
         int32_t move = movePiece(boardCopy + 1, position, naive -> data[i].c);
         /* check results */
         if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-            char promotionOptions[4] = {'5', '3', '2', '4'};
+            char promotionOptions[4] = {WHITE_QUEEN, WHITE_KNIGHT, WHITE_ROOK, WHITE_BISHOP};
             for (int32_t j = 0; j < 4; j++) {
                 boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
                 list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
@@ -799,7 +831,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
             }
         } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-            char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+            char promotionOptions[4] = {BLACK_QUEEN, BLACK_KNIGHT, BLACK_ROOK, BLACK_BISHOP};
             for (int32_t j = 0; j < 4; j++) {
                 boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
                 list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
@@ -814,24 +846,24 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
             list_t *extraChecks = list_init();
             if (naive -> data[i].c == 62) {
                 /* white right castle */
-                boardCopy[63 + 1] = '2'; // revert rook
-                boardCopy[62 + 1] = '0'; // revert king
-                boardCopy[60 + 1] = '6'; // king walk
+                boardCopy[63 + 1] = WHITE_ROOK; // revert rook
+                boardCopy[62 + 1] = BLANK_SPACE; // revert king
+                boardCopy[60 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
-                boardCopy[60 + 1] = '0'; // revert king
-                boardCopy[61 + 1] = '6'; // king walk
+                boardCopy[60 + 1] = BLANK_SPACE; // revert king
+                boardCopy[61 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             } else {
                 /* white left castle */
-                boardCopy[56 + 1] = '2'; // revert rook
-                boardCopy[57 + 1] = '0'; // revert king
-                boardCopy[60 + 1] = '6'; // king walk
+                boardCopy[56 + 1] = WHITE_ROOK; // revert rook
+                boardCopy[57 + 1] = BLANK_SPACE; // revert king
+                boardCopy[60 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
-                boardCopy[60 + 1] = '0'; // revert king
-                boardCopy[59 + 1] = '6'; // king walk
+                boardCopy[60 + 1] = BLANK_SPACE; // revert king
+                boardCopy[59 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
-                boardCopy[59 + 1] = '0'; // revert king
-                boardCopy[58 + 1] = '6'; // king walk
+                boardCopy[59 + 1] = BLANK_SPACE; // revert king
+                boardCopy[58 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             }
             list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
@@ -842,24 +874,24 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
             list_t *extraChecks = list_init();
             if (naive -> data[i].c == 6) {
                 /* black right castle */
-                boardCopy[7 + 1] = '2'; // revert rook
-                boardCopy[6 + 1] = '0'; // revert king
-                boardCopy[4 + 1] = '6'; // king walk
+                boardCopy[7 + 1] = WHITE_ROOK; // revert rook
+                boardCopy[6 + 1] = BLANK_SPACE; // revert king
+                boardCopy[4 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
-                boardCopy[4 + 1] = '0'; // revert king
-                boardCopy[5 + 1] = '6'; // king walk
+                boardCopy[4 + 1] = BLANK_SPACE; // revert king
+                boardCopy[5 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             } else {
                 /* black left castle */
-                boardCopy[0 + 1] = '2'; // revert rook
-                boardCopy[1 + 1] = '0'; // revert king
-                boardCopy[4 + 1] = '6'; // king walk
+                boardCopy[0 + 1] = WHITE_ROOK; // revert rook
+                boardCopy[1 + 1] = BLANK_SPACE; // revert king
+                boardCopy[4 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
-                boardCopy[4 + 1] = '0'; // revert king
-                boardCopy[3 + 1] = '6'; // king walk
+                boardCopy[4 + 1] = BLANK_SPACE; // revert king
+                boardCopy[3 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
-                boardCopy[3 + 1] = '0'; // revert king
-                boardCopy[2 + 1] = '6'; // king walk
+                boardCopy[3 + 1] = BLANK_SPACE; // revert king
+                boardCopy[2 + 1] = WHITE_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             }
             list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
@@ -876,10 +908,13 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
     for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         for (int32_t positionIndex = 0; positionIndex < 64; positionIndex++) {
+            if (moves -> data[movesIndex + MOVES_STRING].s[position + 1] == BLANK_SPACE) {
+                continue;
+            }
             list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_STRING].s + 1, positionIndex, !turn);
             for (int32_t i = 0; i < simulated -> length; i++) {
                 char capturedPiece = moves -> data[movesIndex + MOVES_STRING].s[simulated -> data[i].c + 1];
-                if ((turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
+                if ((turn == CHESS_WHITE && (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE)) || (turn == CHESS_BLACK && (capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE))) {
                     /* this moves captures the king, invalidate the legal move */
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                         list_delete(moves, movesIndex);
@@ -895,10 +930,13 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
         if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
             for (int32_t extra = 0; extra < moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
                 for (int32_t positionIndex = 0; positionIndex < 64; positionIndex++) {
+                    if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[position + 1] == BLANK_SPACE) {
+                        continue;
+                    }
                     list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, positionIndex, !turn);
                     for (int32_t i = 0; i < simulated -> length; i++) {
                         char capturedPiece = moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[simulated -> data[i].c + 1];
-                        if ((turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
+                        if ((turn == CHESS_WHITE && (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE)) || (turn == CHESS_BLACK && (capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE))) {
                             /* this moves captures the king, invalidate the legal move */
                             for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                                 list_delete(moves, movesIndex);
@@ -928,95 +966,95 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
     }
     char piece = board[positionFrom];
     /* check if piece is pawn (with or without en passant), rook (that hasn't moved), or king (that hasn't moved) */
-    if (piece == '1' && positionFrom / 8 == 6 && positionTo / 8 == 4) {
+    if (piece == WHITE_PAWN && positionFrom / 8 == 6 && positionTo / 8 == 4) {
         /* change normal pawn to en passant pawn */
-        piece = '7';
-    } else if (piece == '7') {
+        piece = WHITE_PAWN_EN_PASSANT;
+    } else if (piece == WHITE_PAWN_EN_PASSANT) {
         /* revert en passant to normal pawn */
-        piece = '1';
-    } else if (piece == '8') {
+        piece = WHITE_PAWN;
+    } else if (piece == WHITE_ROOK_NO_MOVE) {
         /* revert rook to has moved */
-        piece = '2';
-    } else if (piece == '9') {
+        piece = WHITE_ROOK;
+    } else if (piece == WHITE_KING_NO_MOVE) {
         /* revert king to has moved */
-        piece = '6';
-    } else if (piece == 'A' && positionFrom / 8 == 1 && positionTo / 8 == 3) {
+        piece = WHITE_KING;
+    } else if (piece == BLACK_PAWN && positionFrom / 8 == 1 && positionTo / 8 == 3) {
         /* change normal pawn to en passant pawn */
-        piece = 'G';
-    } else if (piece == 'G') {
+        piece = BLACK_PAWN_EN_PASSANT;
+    } else if (piece == BLACK_PAWN_EN_PASSANT) {
         /* revert en passant to normal pawn */
-        piece = 'A';
-    } else if (piece == 'H') {
+        piece = BLACK_PAWN;
+    } else if (piece == BLACK_ROOK_NO_MOVE) {
         /* revert rook to has moved */
-        piece = 'B';
-    } else if (piece == 'I') {
+        piece = BLACK_ROOK;
+    } else if (piece == BLACK_KING_NO_MOVE) {
         /* revert king to has moved */
-        piece = 'F';
+        piece = BLACK_KING;
     }
     /* check: pawn promotion */
-    if (piece == '1' && positionTo / 8 == 0) {
-        board[positionFrom] = '0';
+    if (piece == WHITE_PAWN && positionTo / 8 == 0) {
+        board[positionFrom] = BLANK_SPACE;
         board[positionTo] = piece;
         return MOVE_PIECE_PAWN_PROMOTION_WHITE;
-    } else if (piece == 'A' && positionTo / 8 == 7) {
-        board[positionFrom] = '0';
+    } else if (piece == BLACK_PAWN && positionTo / 8 == 7) {
+        board[positionFrom] = BLANK_SPACE;
         board[positionTo] = piece;
         return MOVE_PIECE_PAWN_PROMOTION_BLACK;
     } else {
         /* simulate piece moving */
-        board[positionFrom] = '0';
+        board[positionFrom] = BLANK_SPACE;
         board[positionTo] = piece;
         /* check en passant */
-        if (piece == '1') {
+        if (piece == WHITE_PAWN) {
             int8_t enpassant = down(positionTo);
-            if (enpassant != -1 && board[enpassant] == 'G') {
-                board[enpassant] = '0';
+            if (enpassant != -1 && board[enpassant] == BLACK_PAWN_EN_PASSANT) {
+                board[enpassant] = BLANK_SPACE;
             }
-        } else if (piece == 'b') {
+        } else if (piece == BLACK_ROOK) {
             int8_t enpassant = up(positionTo);
-            if (enpassant != -1 && board[enpassant] == '7') {
-                board[enpassant] = '0';
+            if (enpassant != -1 && board[enpassant] == WHITE_PAWN_EN_PASSANT) {
+                board[enpassant] = BLANK_SPACE;
             }
         }
         /* check castle */
-        if (piece == '6' && positionFrom == 60 && positionTo == 62) {
+        if (piece == WHITE_KING && positionFrom == 60 && positionTo == 62) {
             /* white right castle */
-            board[63] = '0';
-            board[61] = '2';
+            board[63] = BLANK_SPACE;
+            board[61] = WHITE_ROOK;
             return MOVE_PIECE_CASTLE_WHITE;
-        } else if (piece == '6' && positionFrom == 60 && positionTo == 57) {
+        } else if (piece == WHITE_KING && positionFrom == 60 && positionTo == 57) {
             /* white left castle */
-            board[56] = '0';
-            board[58] = '2';
+            board[56] = BLANK_SPACE;
+            board[58] = WHITE_ROOK;
             return MOVE_PIECE_CASTLE_WHITE;
-        } else if (piece == 'F' && positionFrom == 4 && positionTo == 6) {
+        } else if (piece == BLACK_KING && positionFrom == 4 && positionTo == 6) {
             /* black right castle */
-            board[7] = '0';
-            board[5] = 'B';
+            board[7] = BLANK_SPACE;
+            board[5] = BLACK_ROOK;
             return MOVE_PIECE_CASTLE_BLACK;
-        } else if (piece == 'F' && positionFrom == 4 && positionTo == 1) {
+        } else if (piece == BLACK_KING && positionFrom == 4 && positionTo == 1) {
             /* black left castle */
-            board[0] = '0';
-            board[2] = 'B';
+            board[0] = BLANK_SPACE;
+            board[2] = BLACK_ROOK;
             return MOVE_PIECE_CASTLE_BLACK;
         }
     }
     return MOVE_PIECE_SUCCESSFUL;
 }
 
-/* generate all moves and augmented board positions and place them in a file */
+/* generate all moves and augmented board positions, returns a list in the MOVES_X format */
 list_t *generateAllMoves(char *board, int8_t turn) {
     /* initialisation */
     list_t *moves = list_init();
     /* computation */
     for (int32_t position = 0; position < 64; position++) {
-        if (board[position] != '0') {
+        if (board[position] != BLANK_SPACE) {
             list_t *naive = generateNaiveMoves(board, position, turn);
             char boardCopy[66];
             boardCopy[65] = '\0';
             for (int32_t i = 0; i < naive -> length; i++) {
                 if (turn == CHESS_WHITE) {
-                    boardCopy[0] = 'b';
+                    boardCopy[0] = BLACK_ROOK;
                 } else {
                     boardCopy[0] = 'w';
                 }
@@ -1024,7 +1062,7 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                 int32_t move = movePiece(boardCopy + 1, position, naive -> data[i].c);
                 /* check results */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-                    char promotionOptions[4] = {'5', '3', '2', '4'};
+                    char promotionOptions[4] = {WHITE_QUEEN, WHITE_KNIGHT, WHITE_ROOK, WHITE_BISHOP};
                     for (int32_t j = 0; j < 4; j++) {
                         boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
                         list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
@@ -1033,7 +1071,7 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                         list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                     }
                 } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-                    char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+                    char promotionOptions[4] = {BLACK_QUEEN, BLACK_KNIGHT, BLACK_ROOK, BLACK_BISHOP};
                     for (int32_t j = 0; j < 4; j++) {
                         boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
                         list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
@@ -1048,18 +1086,18 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                     list_t *extraChecks = list_init();
                     if (naive -> data[i].c == 62) {
                         /* white right castle */
-                        boardCopy[63 + 1] = '2'; // revert rook
-                        boardCopy[62 + 1] = '0'; // revert king
-                        boardCopy[61 + 1] = '6'; // king walk
+                        boardCopy[63 + 1] = WHITE_ROOK; // revert rook
+                        boardCopy[62 + 1] = BLANK_SPACE; // revert king
+                        boardCopy[61 + 1] = WHITE_KING; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
                     } else {
                         /* white left castle */
-                        boardCopy[56 + 1] = '2'; // revert rook
-                        boardCopy[57 + 1] = '0'; // revert king
-                        boardCopy[59 + 1] = '6'; // king walk
+                        boardCopy[56 + 1] = WHITE_ROOK; // revert rook
+                        boardCopy[57 + 1] = BLANK_SPACE; // revert king
+                        boardCopy[59 + 1] = WHITE_KING; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
-                        boardCopy[59 + 1] = '0'; // revert king
-                        boardCopy[58 + 1] = '6'; // king walk
+                        boardCopy[59 + 1] = BLANK_SPACE; // revert king
+                        boardCopy[58 + 1] = WHITE_KING; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
                     }
                     list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
@@ -1070,18 +1108,18 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                     list_t *extraChecks = list_init();
                     if (naive -> data[i].c == 6) {
                         /* black right castle */
-                        boardCopy[7 + 1] = '2'; // revert rook
-                        boardCopy[6 + 1] = '0'; // revert king
-                        boardCopy[5 + 1] = '6'; // king walk
+                        boardCopy[7 + 1] = WHITE_ROOK; // revert rook
+                        boardCopy[6 + 1] = BLANK_SPACE; // revert king
+                        boardCopy[5 + 1] = WHITE_KING; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
                     } else {
                         /* black left castle */
-                        boardCopy[0 + 1] = '2'; // revert rook
-                        boardCopy[1 + 1] = '0'; // revert king
-                        boardCopy[3 + 1] = '6'; // king walk
+                        boardCopy[0 + 1] = WHITE_ROOK; // revert rook
+                        boardCopy[1 + 1] = BLANK_SPACE; // revert king
+                        boardCopy[3 + 1] = WHITE_KING; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
-                        boardCopy[3 + 1] = '0'; // revert king
-                        boardCopy[2 + 1] = '6'; // king walk
+                        boardCopy[3 + 1] = BLANK_SPACE; // revert king
+                        boardCopy[2 + 1] = WHITE_KING; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
                     }
                     list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
@@ -1100,10 +1138,13 @@ list_t *generateAllMoves(char *board, int8_t turn) {
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
     for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         for (int32_t position = 0; position < 64; position++) {
+            if (moves -> data[movesIndex + MOVES_STRING].s[position + 1] == BLANK_SPACE) {
+                continue;
+            }
             list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_STRING].s + 1, position, !turn);
             for (int32_t i = 0; i < simulated -> length; i++) {
                 char capturedPiece = moves -> data[movesIndex + MOVES_STRING].s[simulated -> data[i].c + 1];
-                if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') {
+                if (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE || capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE) {
                     /* this moves captures the king, invalidate the legal move */
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                         list_delete(moves, movesIndex);
@@ -1119,10 +1160,13 @@ list_t *generateAllMoves(char *board, int8_t turn) {
         if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
             for (int32_t extra = 0; extra < moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
                 for (int32_t position = 0; position < 64; position++) {
+                    if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[position + 1] == BLANK_SPACE) {
+                        continue;
+                    }
                     list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, position, !turn);
                     for (int32_t i = 0; i < simulated -> length; i++) {
                         char capturedPiece = moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[simulated -> data[i].c + 1];
-                        if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') {
+                        if (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE || capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE) {
                             /* this moves captures the king, invalidate the legal move */
                             for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                                 list_delete(moves, movesIndex);
@@ -1142,6 +1186,28 @@ list_t *generateAllMoves(char *board, int8_t turn) {
     return moves;
 }
 
+/* check for checkmate, stalemate, check, or none */
+int32_t checkBoardState(char *board, int8_t turn) {
+    /* check for check */
+    int8_t check = 0;
+
+    /* check for stalemate */
+    int8_t stalemate = 0;
+    list_t *moves = generateAllMoves(board, turn);
+    if (moves -> length == 0) {
+        stalemate = 1;
+    }
+    list_free(moves);
+    if (stalemate && check) {
+        return BOARD_STATE_CHECKMATE;
+    } else if (stalemate) {
+        return BOARD_STATE_STALEMATE;
+    } else if (check) {
+        return BOARD_STATE_CHECK;
+    }
+    return BOARD_STATE_NONE;
+}
+
 int32_t engineMove(char *engineName) {
     MUTEX_ACQUIRE(self.boardMutex);
     list_t *moves = generateAllMoves(self.board, self.turn);
@@ -1155,7 +1221,7 @@ int32_t engineMove(char *engineName) {
     }
     char turnChar = 'w';
     if (self.turn == CHESS_BLACK) {
-        turnChar = 'b';
+        turnChar = BLACK_ROOK;
     }
     fwrite(&turnChar, 1, 1, inputfp);
     fwrite(self.board, 1, 64, inputfp);
@@ -1211,7 +1277,6 @@ int32_t engineMove(char *engineName) {
     if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE || move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
         self.board[moves -> data[found + MOVES_TO].c] = line[moves -> data[found + MOVES_TO].c + 1];
     }
-    MUTEX_RELEASE(self.boardMutex);
     MUTEX_ACQUIRE(self.validMutex);
     list_clear(self.valid);
     MUTEX_RELEASE(self.validMutex);
@@ -1221,6 +1286,8 @@ int32_t engineMove(char *engineName) {
     self.mousePiece = -1;
     self.turn = !self.turn;
     list_free(moves);
+    checkBoardState(self.board, self.turn);
+    MUTEX_RELEASE(self.boardMutex);
     return 0;
 }
 
@@ -1235,15 +1302,16 @@ void mouse() {
             if ((self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) && self.pawnPromotionIndex != -1) {
                 MUTEX_ACQUIRE(self.boardMutex);
                 if (self.pawnPromotionWhite != -1) {
-                    char promotionOptions[4] = {'5', '3', '2', '4'};
+                    char promotionOptions[4] = {WHITE_QUEEN, WHITE_KNIGHT, WHITE_ROOK, WHITE_BISHOP};
                     self.board[self.pawnPromotionWhite] = promotionOptions[self.pawnPromotionIndex];
                     self.pawnPromotionWhite = -1;
                 } else {
-                    char promotionOptions[4] = {'E', 'C', 'B', 'D'};
+                    char promotionOptions[4] = {BLACK_QUEEN, BLACK_KNIGHT, BLACK_ROOK, BLACK_BISHOP};
                     self.board[self.pawnPromotionBlack] = promotionOptions[self.pawnPromotionIndex];
                     self.pawnPromotionBlack = -1;
                 }
                 self.turn = !self.turn;
+                checkBoardState(self.board, self.turn);
                 MUTEX_RELEASE(self.boardMutex);
                 return;
             }
@@ -1266,7 +1334,10 @@ void mouse() {
                 self.highlightedSquare[2] = self.mousePiece;
                 self.highlightedSquare[0] = -1;
                 self.mousePiece = -1;
-            } else if (self.mousePiece == -1 || self.board[self.mousePiece] == '0') {
+                if (move != MOVE_PIECE_PAWN_PROMOTION_WHITE && move != MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                    checkBoardState(self.board, self.turn);
+                }
+            } else if (self.mousePiece == -1 || self.board[self.mousePiece] == BLANK_SPACE) {
                 list_clear(self.valid);
                 self.highlightedSquare[0] = -1;
                 self.mousePiece = -1;
@@ -1275,7 +1346,6 @@ void mouse() {
                     self.highlightUnselect = 1;
                 }
                 self.highlightedSquare[0] = self.mousePiece;
-                
                 list_free(self.valid);
                 self.valid = generateLegalMoves(self.board, self.highlightedSquare[0], self.turn);
             }
@@ -1295,7 +1365,6 @@ void mouse() {
                 /* make move */
                 MUTEX_ACQUIRE(self.boardMutex);
                 int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
-                MUTEX_RELEASE(self.boardMutex);
                 /* special: pawn promotion */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
                     self.pawnPromotionWhite = self.mouseSquare;
@@ -1308,6 +1377,10 @@ void mouse() {
                 self.highlightedSquare[1] = self.highlightedSquare[0];
                 self.highlightedSquare[2] = self.mouseSquare;
                 self.highlightedSquare[0] = -1;
+                if (move != MOVE_PIECE_PAWN_PROMOTION_WHITE && move != MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                    checkBoardState(self.board, self.turn);
+                }
+                MUTEX_RELEASE(self.boardMutex);
             } else if (self.mouseSquare == self.mousePiece && self.highlightUnselect) {
                 list_clear(self.valid);
                 self.highlightedSquare[0] = -1;
