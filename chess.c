@@ -31,8 +31,11 @@ TODO:
 #include "turtle.h"
 #include <time.h>
 
-void generateAllMoves(char *filename);
+#define MUTEX_ACQUIRE(mutex) while (mutex) {asm("nop");} mutex = 1
+#define MUTEX_RELEASE(mutex) mutex = 0
+
 int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo);
+int32_t engineMove(char *engineName);
 
 typedef enum {
     CHESS_PIECE_PAWN = 0,
@@ -120,10 +123,12 @@ typedef struct {
     int8_t highlightedSquare[3]; // selected with color CHESS_COLOR_X_SQUARE_HIGHLIGHT (0 is editing piece, 1 and 2 are last move)
     int8_t highlightedSquareBox; // selected with color CHESS_COLOR_X_SQUARE_HIGHLIGHT_BOX
     int8_t highlightUnselect;
-    list_t *dotSquares; // list of squares marked with a dot (for valid)
+    list_t *valid; // list of squares marked with a dot (for valid)
     int8_t pawnPromotionWhite;
     int8_t pawnPromotionBlack;
     int8_t pawnPromotionIndex;
+    volatile int8_t boardMutex; // data access on self.board
+    volatile int8_t validMutex; // data access on self.valid
 
     /* board */
     double boardX;
@@ -131,7 +136,6 @@ typedef struct {
     double boardSize;
 
     /* engines */
-    list_t *moves; // see MOVES_X
     char inputFilename[4096];
     char outputFilename[4096];
     tt_button_t *mohamed;
@@ -156,7 +160,9 @@ void init() {
     self.pawnPromotionWhite = -1;
     self.pawnPromotionBlack = -1;
     self.pawnPromotionIndex = -1;
-    self.dotSquares = list_init();
+    self.valid = list_init();
+    self.boardMutex = 0;
+    self.validMutex = 0;
 
     /* textures */
     char *constructedFilepath = malloc(5120);
@@ -217,7 +223,6 @@ void init() {
     self.boardSize = 160;
 
     /* engines */
-    self.moves = list_init();
     strcpy(self.inputFilename, osToolsFileDialog.executableFilepath);
     strcat(self.inputFilename, "input.txt");
     strcpy(self.outputFilename, osToolsFileDialog.executableFilepath);
@@ -233,12 +238,12 @@ void setColor(int32_t color) {
     turtlePenColorAlpha(colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 0], colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 1], colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 2], colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 3]);
 }
 
-/* import a file to board */
+/* import a file to board - TODO */
 int32_t import(char *filename) {
 
 }
 
-/* export the board state */
+/* export the board state - TODO */
 int32_t export(char *filename) {
 
 }
@@ -252,10 +257,10 @@ void printBoard(char *board) {
     }
 }
 
-void printDotSquares() {
-    printf("self.dotSquares = [");
-    for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-        printf("%d ", self.dotSquares -> data[i].c);
+void printValid(list_t *valid) {
+    printf("[");
+    for (int32_t i = 0; i < valid -> length; i++) {
+        printf("%d ", valid -> data[i].c);
     }
     printf("]\n");
 }
@@ -422,6 +427,7 @@ void render() {
     /* render pieces */
     xpos = self.boardX - self.boardSize + shift;
     ypos = self.boardY + self.boardSize - shift;
+    MUTEX_ACQUIRE(self.boardMutex);
     for (int32_t i = 0; i < 64; i++) {
         if (self.board[i] != '0') {
             turtle_texture_t texture = getPieceTexture(self.board[i]);
@@ -429,7 +435,8 @@ void render() {
                 turtleTexture(texture, xpos - shift, ypos - shift, xpos + shift, ypos + shift, 0);
             }
         }
-        if (list_find(self.dotSquares, (unitype) i, 'c') != -1) {
+        MUTEX_ACQUIRE(self.validMutex);
+        if (list_find(self.valid, (unitype) i, 'c') != -1) {
             setColor(CHESS_COLOR_SQUARE_DOT);
             if (self.board[i] == '0') {
                 turtleCircle(xpos, ypos, shift * 0.35);
@@ -446,6 +453,7 @@ void render() {
                 turtlePenShape("circle");
             }
         }
+        MUTEX_RELEASE(self.validMutex);
         xpos += shift * 2;
         if (i % 8 == 7) {
             xpos = self.boardX - self.boardSize + shift;
@@ -458,6 +466,7 @@ void render() {
             turtleTexture(texture, turtle.mouseX - shift, turtle.mouseY - shift, turtle.mouseX + shift, turtle.mouseY + shift, 0);
         }
     }
+    MUTEX_RELEASE(self.boardMutex);
     /* render sidebar */
     if (self.turn == CHESS_WHITE) {
         tt_setColor(TT_COLOR_WHITE);
@@ -513,58 +522,17 @@ void render() {
     /* engine buttons */
     if (self.mohamed -> value) {
         self.mohamed -> value = 0;
-        generateAllMoves(self.inputFilename);
+        int32_t status = engineMove("mohamed.exe");
+        if (status != 0) {
+
+        }
     }
     if (self.ryan -> value) {
         self.ryan -> value = 0;
-        generateAllMoves(self.inputFilename);
-        char *command = malloc(8192);
-        // sprintf(command, "\"%sryan.exe\"", osToolsFileDialog.executableFilepath);
-        sprintf(command, "\"\"%sryan.exe\" \"%s\" \"%s\"\"", osToolsFileDialog.executableFilepath, self.inputFilename, self.outputFilename); // idk why it needs to be double quoted
-        // printf("%s\n", command);
-        int32_t status = system(command);
-        free(command);
+        int32_t status = engineMove("ryan.exe");
         if (status != 0) {
-            printf("ERROR: ryan.exe returned error code %d\n", status);
-            return;
+
         }
-        /* check board */
-        FILE *fp = fopen(self.outputFilename, "r");
-        if (fp == NULL) {
-            printf("ERROR: Could not open file %s\n", self.outputFilename);
-            return;
-        }
-        char line[1024];
-        fgets(line, 1024, fp);
-        fclose(fp);
-        for (int32_t i = 0; i < 2; i++) {
-            if (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r') {
-                line[strlen(line) - 1] = '\0';
-            }
-        }
-        int32_t found = -1;
-        for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
-            if (strcmp(self.moves -> data[movesIndex + MOVES_STRING].s, line) == 0) {
-                found = movesIndex;
-                break;
-            }
-        }
-        if (found == -1) {
-            printf("ERROR: ryan.exe output (%s) is invalid\n", line);
-            return;
-        }
-        /* make move */
-        int32_t move = movePiece(self.board, self.moves -> data[found + MOVES_FROM].c, self.moves -> data[found + MOVES_TO].c);
-        /* check for pawn promotion */
-        if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE || move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-            self.board[self.moves -> data[found + MOVES_TO].c] = line[self.moves -> data[found + MOVES_TO].c + 1];
-        }
-        list_clear(self.dotSquares);
-        self.highlightedSquare[1] = self.moves -> data[found + MOVES_FROM].c;
-        self.highlightedSquare[2] = self.moves -> data[found + MOVES_TO].c;
-        self.highlightedSquare[0] = -1;
-        self.mousePiece = -1;
-        self.turn = !self.turn;
     }
 }
 
@@ -624,20 +592,23 @@ static inline int8_t downRight(int8_t position) {
     return down(right(position));
 }
 
-/* naive generation - does not cull moves that would put the king in check, returns moves in self.dotSquares */
-void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
-    list_clear(self.dotSquares);
+/* returns a list of positions where this piece can move to. Naive generation - does not cull moves that would put the king in check */
+list_t *generateNaiveMoves(char *board, int8_t position, int8_t turn) {
+    /* initialisation */
+    list_t *output = list_init();
+    /* validation */
     if (position == -1) {
-        return;
+        return output;
     }
     chess_piece_t type = getPieceType(board[position]);
     chess_color_t color = getPieceColor(board[position]);
     if (type == -1 || color == -1) {
-        return;
+        return output;
     }
     if (color != turn) {
-        return;
+        return output;
     }
+    /* computation */
     if (type == CHESS_PIECE_PAWN) {
         /* pawn */
         int8_t (*direction[3]) (int8_t position);
@@ -660,7 +631,7 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         int8_t wanderingPosition = direction[0](position);
         if (wanderingPosition != -1) {
             if (board[wanderingPosition] == '0') {
-                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                list_append(output, (unitype) wanderingPosition, 'c');
                 spaceEmpty = 1;
             }
         }
@@ -669,7 +640,7 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
             wanderingPosition = direction[0](wanderingPosition);
             if (wanderingPosition != -1) {
                 if (board[wanderingPosition] == '0') {
-                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                    list_append(output, (unitype) wanderingPosition, 'c');
                 }
             }
         }
@@ -678,14 +649,14 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
         int8_t enpassantPosition = left(position);
         if (wanderingPosition != -1) {
             if ((board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == '0' && getPieceColor(board[enpassantPosition]) != color && (board[enpassantPosition] == '7' || board[enpassantPosition] == 'G'))) {
-                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                list_append(output, (unitype) wanderingPosition, 'c');
             }
         }
         wanderingPosition = direction[2](position);
         enpassantPosition = right(position);
         if (wanderingPosition != -1) {
             if ((board[wanderingPosition] != '0' && getPieceColor(board[wanderingPosition]) != color) || (board[wanderingPosition] == '0' && getPieceColor(board[enpassantPosition]) != color && (board[enpassantPosition] == '7' || board[enpassantPosition] == 'G'))) {
-                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                list_append(output, (unitype) wanderingPosition, 'c');
             }
         }
         /* Note: pawn promotion handled in movePiece */
@@ -701,10 +672,10 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                     break;
                 }
                 if (board[wanderingPosition] == '0') {
-                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                    list_append(output, (unitype) wanderingPosition, 'c');
                 } else {
                     if (getPieceColor(board[wanderingPosition]) != color) {
-                        list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                        list_append(output, (unitype) wanderingPosition, 'c');
                     }
                     break;
                 }
@@ -719,11 +690,11 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
             wanderingPosition = direction[j](wanderingPosition);
             int8_t checkPosition = direction[j + 1](wanderingPosition);
             if (checkPosition != -1 && (board[checkPosition] == '0' || getPieceColor(board[checkPosition]) != color)) {
-                list_append(self.dotSquares, (unitype) checkPosition, 'c');
+                list_append(output, (unitype) checkPosition, 'c');
             }
             checkPosition = direction[j + 2](wanderingPosition);
             if (checkPosition != -1 && (board[checkPosition] == '0' || getPieceColor(board[checkPosition]) != color)) {
-                list_append(self.dotSquares, (unitype) checkPosition, 'c');
+                list_append(output, (unitype) checkPosition, 'c');
             }
         }
     } else if (type == CHESS_PIECE_BISHOP) {
@@ -738,10 +709,10 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                     break;
                 }
                 if (board[wanderingPosition] == '0') {
-                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                    list_append(output, (unitype) wanderingPosition, 'c');
                 } else {
                     if (getPieceColor(board[wanderingPosition]) != color) {
-                        list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                        list_append(output, (unitype) wanderingPosition, 'c');
                     }
                     break;
                 }
@@ -759,10 +730,10 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
                     break;
                 }
                 if (board[wanderingPosition] == '0') {
-                    list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                    list_append(output, (unitype) wanderingPosition, 'c');
                 } else {
                     if (getPieceColor(board[wanderingPosition]) != color) {
-                        list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                        list_append(output, (unitype) wanderingPosition, 'c');
                     }
                     break;
                 }
@@ -776,68 +747,72 @@ void generateNaiveMoves(char *board, int8_t position, int8_t turn) {
             int8_t wanderingPosition = position;
             wanderingPosition = direction[j](wanderingPosition);
             if (wanderingPosition != -1 && (board[wanderingPosition] == '0' || getPieceColor(board[wanderingPosition]) != color)) {
-                list_append(self.dotSquares, (unitype) wanderingPosition, 'c');
+                list_append(output, (unitype) wanderingPosition, 'c');
             }
         }
         /* castling */
         if (board[position] == '9' && board[63] == '8' && board[62] == '0' && board[61] == '0') {
             /* white right castle */
-            list_append(self.dotSquares, (unitype) 62, 'c');
+            list_append(output, (unitype) 62, 'c');
         }
         if (board[position] == '9' && board[56] == '8' && board[57] == '0' && board[58] == '0' && board[59] == '0') {
             /* white left castle */
-            list_append(self.dotSquares, (unitype) 57, 'c');
+            list_append(output, (unitype) 57, 'c');
         }
         if (board[position] == 'I' && board[7] == 'H' && board[6] == '0' && board[5] == '0') {
             /* black right castle */
-            list_append(self.dotSquares, (unitype) 6, 'c');
+            list_append(output, (unitype) 6, 'c');
         }
         if (board[position] == 'I' && board[0] == 'H' && board[1] == '0' && board[2] == '0' && board[3] == '0') {
             /* black left castle */
-            list_append(self.dotSquares, (unitype) 1, 'c');
+            list_append(output, (unitype) 1, 'c');
         }
     }
+    return output;
 }
 
-/* generates moves */
-void generateLegalMoves(char *board, int8_t position, int8_t turn) {
-    generateNaiveMoves(self.board, position, self.turn);
-    list_clear(self.moves);
+/* returns a list of positions where this piece can move to */
+list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
+    /* initialisation */
+    list_t *output = list_init();
+    /* computation */
+    list_t *naive = generateNaiveMoves(board, position, turn);
+    list_t *moves = list_init();
     char boardCopy[66];
     boardCopy[65] = '\0';
-    for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-        if (self.turn == CHESS_WHITE) {
+    for (int32_t i = 0; i < naive -> length; i++) {
+        if (turn == CHESS_WHITE) {
             boardCopy[0] = 'b';
         } else {
             boardCopy[0] = 'w';
         }
-        memcpy(boardCopy + 1, self.board, 64);
-        int32_t move = movePiece(boardCopy + 1, position, self.dotSquares -> data[i].c);
+        memcpy(boardCopy + 1, board, 64);
+        int32_t move = movePiece(boardCopy + 1, position, naive -> data[i].c);
         /* check results */
         if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
             char promotionOptions[4] = {'5', '3', '2', '4'};
             for (int32_t j = 0; j < 4; j++) {
-                boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
-                list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
-                list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+                boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
+                list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
             }
         } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
             char promotionOptions[4] = {'E', 'C', 'B', 'D'};
             for (int32_t j = 0; j < 4; j++) {
-                boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
-                list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
-                list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+                boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
+                list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
             }
         } else if (move == MOVE_PIECE_CASTLE_WHITE) {
-            list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-            list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-            list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+            list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+            list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+            list_append(moves, naive -> data[i], 'c'); // MOVES_TO
             list_t *extraChecks = list_init();
-            if (self.dotSquares -> data[i].c == 62) {
+            if (naive -> data[i].c == 62) {
                 /* white right castle */
                 boardCopy[63 + 1] = '2'; // revert rook
                 boardCopy[62 + 1] = '0'; // revert king
@@ -859,13 +834,13 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 boardCopy[58 + 1] = '6'; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             }
-            list_append(self.moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
+            list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
         } else if (move == MOVE_PIECE_CASTLE_BLACK) {
-            list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-            list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-            list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+            list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+            list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+            list_append(moves, naive -> data[i], 'c'); // MOVES_TO
             list_t *extraChecks = list_init();
-            if (self.dotSquares -> data[i].c == 6) {
+            if (naive -> data[i].c == 6) {
                 /* black right castle */
                 boardCopy[7 + 1] = '2'; // revert rook
                 boardCopy[6 + 1] = '0'; // revert king
@@ -887,60 +862,63 @@ void generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 boardCopy[2 + 1] = '6'; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             }
-            list_append(self.moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
+            list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
         } else if (move == MOVE_PIECE_SUCCESSFUL) {
-            list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-            list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-            list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
-            list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+            list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+            list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+            list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+            list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
         } else {
             printf("ERROR: movePiece returned MOVE_PIECE_ERROR\n");
         }
     }
+    list_free(naive);
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
-    for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+    for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         for (int32_t positionIndex = 0; positionIndex < 64; positionIndex++) {
-            generateNaiveMoves(self.moves -> data[movesIndex + MOVES_STRING].s + 1, positionIndex, !self.turn);
-            for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-                char capturedPiece = self.moves -> data[movesIndex + MOVES_STRING].s[self.dotSquares -> data[i].c + 1];
-                if ((self.turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (self.turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
+            list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_STRING].s + 1, positionIndex, !turn);
+            for (int32_t i = 0; i < simulated -> length; i++) {
+                char capturedPiece = moves -> data[movesIndex + MOVES_STRING].s[simulated -> data[i].c + 1];
+                if ((turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
                     /* this moves captures the king, invalidate the legal move */
-                    // printf("invalidate due to %d to %d\n", positionIndex, self.dotSquares -> data[i].c);
-                    // printDotSquares();
-                    // printBoard(self.moves -> data[movesIndex + MOVES_STRING].s + 1);
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
-                        list_delete(self.moves, movesIndex);
+                        list_delete(moves, movesIndex);
                     }
                     movesIndex -= MOVES_NUMBER_OF_FIELDS;
+                    list_free(simulated);
                     goto SECOND_PASS_NEXT;
                 }
             }
+            list_free(simulated);
         }
         /* extra moves to validate - castling cannot have the king "walk" through check */
-        if (self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
-            for (int32_t extra = 0; extra < self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
+        if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
+            for (int32_t extra = 0; extra < moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
                 for (int32_t positionIndex = 0; positionIndex < 64; positionIndex++) {
-                    generateNaiveMoves(self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, positionIndex, !self.turn);
-                    for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-                        char capturedPiece = self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[self.dotSquares -> data[i].c + 1];
-                        if ((self.turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (self.turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
+                    list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, positionIndex, !turn);
+                    for (int32_t i = 0; i < simulated -> length; i++) {
+                        char capturedPiece = moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[simulated -> data[i].c + 1];
+                        if ((turn == CHESS_WHITE && (capturedPiece == '6' || capturedPiece == '9')) || (turn == CHESS_BLACK && (capturedPiece == 'F' || capturedPiece == 'I'))) {
                             /* this moves captures the king, invalidate the legal move */
                             for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
-                                list_delete(self.moves, movesIndex);
+                                list_delete(moves, movesIndex);
                             }
                             movesIndex -= MOVES_NUMBER_OF_FIELDS;
+                            list_free(simulated);
                             goto SECOND_PASS_NEXT;
                         }
                     }
+                    list_free(simulated);
                 }
             }
         }
         SECOND_PASS_NEXT:
     }
-    list_clear(self.dotSquares);
-    for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
-        list_append(self.dotSquares, self.moves -> data[movesIndex + MOVES_TO], 'c');
+    for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+        list_append(output, moves -> data[movesIndex + MOVES_TO], 'c');
     }
+    list_free(moves);
+    return output;
 }
 
 /* simulate a move - returns one of MOVE_PIECE_X */
@@ -991,12 +969,12 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
         /* check en passant */
         if (piece == '1') {
             int8_t enpassant = down(positionTo);
-            if (enpassant != -1 && self.board[enpassant] == 'G') {
+            if (enpassant != -1 && board[enpassant] == 'G') {
                 board[enpassant] = '0';
             }
         } else if (piece == 'b') {
             int8_t enpassant = up(positionTo);
-            if (enpassant != -1 && self.board[enpassant] == '7') {
+            if (enpassant != -1 && board[enpassant] == '7') {
                 board[enpassant] = '0';
             }
         }
@@ -1027,48 +1005,48 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
 }
 
 /* generate all moves and augmented board positions and place them in a file */
-void generateAllMoves(char *filename) {
-    list_clear(self.moves);
+list_t *generateAllMoves(char *board, int8_t turn) {
+    /* initialisation */
+    list_t *moves = list_init();
+    /* computation */
     for (int32_t position = 0; position < 64; position++) {
-        if (self.board[position] != '0') {
-            generateNaiveMoves(self.board, position, self.turn);
+        if (board[position] != '0') {
+            list_t *naive = generateNaiveMoves(board, position, turn);
             char boardCopy[66];
             boardCopy[65] = '\0';
-            for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-                if (self.turn == CHESS_WHITE) {
+            for (int32_t i = 0; i < naive -> length; i++) {
+                if (turn == CHESS_WHITE) {
                     boardCopy[0] = 'b';
                 } else {
                     boardCopy[0] = 'w';
                 }
-                memcpy(boardCopy + 1, self.board, 64);
-                int32_t move = movePiece(boardCopy + 1, position, self.dotSquares -> data[i].c);
+                memcpy(boardCopy + 1, board, 64);
+                int32_t move = movePiece(boardCopy + 1, position, naive -> data[i].c);
                 /* check results */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-                    printf("generateAllMoves: MOVE_PIECE_PAWN_PROMOTION_WHITE\n");
                     char promotionOptions[4] = {'5', '3', '2', '4'};
                     for (int32_t j = 0; j < 4; j++) {
-                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
-                        list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                        list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                        list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
-                        list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+                        boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
+                        list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                        list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                        list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                        list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                     }
                 } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-                    printf("generateAllMoves: MOVE_PIECE_PAWN_PROMOTION_BLACK\n");
                     char promotionOptions[4] = {'E', 'C', 'B', 'D'};
                     for (int32_t j = 0; j < 4; j++) {
-                        boardCopy[self.dotSquares -> data[i].c + 1] = promotionOptions[j];
-                        list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                        list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                        list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
-                        list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+                        boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
+                        list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                        list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                        list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                        list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                     }
                 } else if (move == MOVE_PIECE_CASTLE_WHITE) {
-                    list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                    list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                    list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+                    list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                    list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                    list_append(moves, naive -> data[i], 'c'); // MOVES_TO
                     list_t *extraChecks = list_init();
-                    if (self.dotSquares -> data[i].c == 62) {
+                    if (naive -> data[i].c == 62) {
                         /* white right castle */
                         boardCopy[63 + 1] = '2'; // revert rook
                         boardCopy[62 + 1] = '0'; // revert king
@@ -1084,13 +1062,13 @@ void generateAllMoves(char *filename) {
                         boardCopy[58 + 1] = '6'; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
                     }
-                    list_append(self.moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
+                    list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
                 } else if (move == MOVE_PIECE_CASTLE_BLACK) {
-                    list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                    list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                    list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
+                    list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                    list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                    list_append(moves, naive -> data[i], 'c'); // MOVES_TO
                     list_t *extraChecks = list_init();
-                    if (self.dotSquares -> data[i].c == 6) {
+                    if (naive -> data[i].c == 6) {
                         /* black right castle */
                         boardCopy[7 + 1] = '2'; // revert rook
                         boardCopy[6 + 1] = '0'; // revert king
@@ -1106,74 +1084,144 @@ void generateAllMoves(char *filename) {
                         boardCopy[2 + 1] = '6'; // king walk
                         list_append(extraChecks, (unitype) boardCopy, 's');
                     }
-                    list_append(self.moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
+                    list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
                 } else if (move == MOVE_PIECE_SUCCESSFUL) {
-                    list_append(self.moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                    list_append(self.moves, (unitype) position, 'c'); // MOVES_FROM
-                    list_append(self.moves, self.dotSquares -> data[i], 'c'); // MOVES_TO
-                    list_append(self.moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+                    list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                    list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                    list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                    list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
                 } else {
                     printf("ERROR: movePiece returned MOVE_PIECE_ERROR\n");
                 }
             }
+            list_free(naive);
         }
     }
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
-    for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+    for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         for (int32_t position = 0; position < 64; position++) {
-            generateNaiveMoves(self.moves -> data[movesIndex + MOVES_STRING].s + 1, position, !self.turn);
-            for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-                char capturedPiece = self.moves -> data[movesIndex + MOVES_STRING].s[self.dotSquares -> data[i].c + 1];
+            list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_STRING].s + 1, position, !turn);
+            for (int32_t i = 0; i < simulated -> length; i++) {
+                char capturedPiece = moves -> data[movesIndex + MOVES_STRING].s[simulated -> data[i].c + 1];
                 if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') {
                     /* this moves captures the king, invalidate the legal move */
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
-                        list_delete(self.moves, movesIndex);
+                        list_delete(moves, movesIndex);
                     }
                     movesIndex -= MOVES_NUMBER_OF_FIELDS;
+                    list_free(simulated);
                     goto SECOND_PASS_NEXT;
                 }
             }
+            list_free(simulated);
         }
         /* extra moves to validate - castling cannot have the king "walk" through check */
-        if (self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
-            for (int32_t extra = 0; extra < self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
+        if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
+            for (int32_t extra = 0; extra < moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
                 for (int32_t position = 0; position < 64; position++) {
-                    generateNaiveMoves(self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, position, !self.turn);
-                    for (int32_t i = 0; i < self.dotSquares -> length; i++) {
-                        char capturedPiece = self.moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[self.dotSquares -> data[i].c + 1];
+                    list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, position, !turn);
+                    for (int32_t i = 0; i < simulated -> length; i++) {
+                        char capturedPiece = moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[simulated -> data[i].c + 1];
                         if (capturedPiece == '6' || capturedPiece == '9' || capturedPiece == 'F' || capturedPiece == 'I') {
                             /* this moves captures the king, invalidate the legal move */
                             for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
-                                list_delete(self.moves, movesIndex);
+                                list_delete(moves, movesIndex);
                             }
                             movesIndex -= MOVES_NUMBER_OF_FIELDS;
+                            list_free(simulated);
                             goto SECOND_PASS_NEXT;
                         }
                     }
+                    list_free(simulated);
                 }
             }
         }
         SECOND_PASS_NEXT:
     }
-    list_clear(self.dotSquares);
-    printf("Number of moves: %d\n", self.moves -> length / MOVES_NUMBER_OF_FIELDS);
-    FILE *fp = fopen(filename, "wb");
-    if (fp == NULL) {
-        printf("ERROR: Could not open file %s\n", filename);
-        return;
+    printf("Number of moves: %d\n", moves -> length / MOVES_NUMBER_OF_FIELDS);
+    return moves;
+}
+
+int32_t engineMove(char *engineName) {
+    MUTEX_ACQUIRE(self.boardMutex);
+    list_t *moves = generateAllMoves(self.board, self.turn);
+    /* place moves in inputFile */
+    FILE *inputfp = fopen(self.inputFilename, "wb");
+    if (inputfp == NULL) {
+        printf("ERROR: Could not open file %s\n", self.inputFilename);
+        list_free(moves);
+        MUTEX_RELEASE(self.boardMutex);
+        return -1;
     }
     char turnChar = 'w';
     if (self.turn == CHESS_BLACK) {
         turnChar = 'b';
     }
-    fwrite(&turnChar, 1, 1, fp);
-    fwrite(self.board, 1, 64, fp);
-    fwrite("\n", 1, 1, fp);
-    for (int32_t movesIndex = 0; movesIndex < self.moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
-        fwrite(self.moves -> data[movesIndex + MOVES_STRING].s, 1, 65, fp);
-        fwrite("\n", 1, 1, fp);
+    fwrite(&turnChar, 1, 1, inputfp);
+    fwrite(self.board, 1, 64, inputfp);
+    MUTEX_RELEASE(self.boardMutex);
+    fwrite("\n", 1, 1, inputfp);
+    for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+        fwrite(moves -> data[movesIndex + MOVES_STRING].s, 1, 65, inputfp);
+        fwrite("\n", 1, 1, inputfp);
     }
-    fclose(fp);
+    fclose(inputfp);
+    /* run engine */
+    char *command = malloc(8192);
+    sprintf(command, "\"\"%s%s\" \"%s\" \"%s\"\"", osToolsFileDialog.executableFilepath, engineName, self.inputFilename, self.outputFilename); // idk why it needs to be double quoted
+    // printf("%s\n", command);
+    int32_t status = system(command);
+    free(command);
+    if (status != 0) {
+        printf("ERROR: %s returned error code %d\n", engineName, status);
+        list_free(moves);
+        return -1;
+    }
+    /* check board */
+    FILE *outputfp = fopen(self.outputFilename, "r");
+    if (outputfp == NULL) {
+        printf("ERROR: Could not open file %s\n", self.outputFilename);
+        list_free(moves);
+        return -1;
+    }
+    char line[1024];
+    fgets(line, 1024, outputfp);
+    fclose(outputfp);
+    for (int32_t i = 0; i < 2; i++) {
+        if (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r') {
+            line[strlen(line) - 1] = '\0';
+        }
+    }
+    int32_t found = -1;
+    for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
+        if (strcmp(moves -> data[movesIndex + MOVES_STRING].s, line) == 0) {
+            found = movesIndex;
+            break;
+        }
+    }
+    if (found == -1) {
+        printf("ERROR: %s output (%s) is invalid\n", engineName, line);
+        list_free(moves);
+        return -1;
+    }
+    /* make move */
+    MUTEX_ACQUIRE(self.boardMutex);
+    int32_t move = movePiece(self.board, moves -> data[found + MOVES_FROM].c, moves -> data[found + MOVES_TO].c);
+    /* check for pawn promotion */
+    if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE || move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+        self.board[moves -> data[found + MOVES_TO].c] = line[moves -> data[found + MOVES_TO].c + 1];
+    }
+    MUTEX_RELEASE(self.boardMutex);
+    MUTEX_ACQUIRE(self.validMutex);
+    list_clear(self.valid);
+    MUTEX_RELEASE(self.validMutex);
+    self.highlightedSquare[1] = moves -> data[found + MOVES_FROM].c;
+    self.highlightedSquare[2] = moves -> data[found + MOVES_TO].c;
+    self.highlightedSquare[0] = -1;
+    self.mousePiece = -1;
+    self.turn = !self.turn;
+    list_free(moves);
+    return 0;
 }
 
 void mouse() {
@@ -1185,6 +1233,7 @@ void mouse() {
             /* first tick */
             self.keys[KEYS_LMB] = 1;
             if ((self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) && self.pawnPromotionIndex != -1) {
+                MUTEX_ACQUIRE(self.boardMutex);
                 if (self.pawnPromotionWhite != -1) {
                     char promotionOptions[4] = {'5', '3', '2', '4'};
                     self.board[self.pawnPromotionWhite] = promotionOptions[self.pawnPromotionIndex];
@@ -1195,10 +1244,13 @@ void mouse() {
                     self.pawnPromotionBlack = -1;
                 }
                 self.turn = !self.turn;
+                MUTEX_RELEASE(self.boardMutex);
                 return;
             }
             self.mousePiece = self.mouseSquare;
-            if (self.mousePiece != -1 && list_find(self.dotSquares, (unitype) self.mousePiece, 'c') >= 0) {
+            MUTEX_ACQUIRE(self.validMutex);
+            MUTEX_ACQUIRE(self.boardMutex);
+            if (self.mousePiece != -1 && list_find(self.valid, (unitype) self.mousePiece, 'c') >= 0) {
                 /* make move */
                 int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mousePiece);
                 /* check for pawn promotion */
@@ -1209,13 +1261,13 @@ void mouse() {
                 } else {
                     self.turn = !self.turn;
                 }
-                list_clear(self.dotSquares);
+                list_clear(self.valid);
                 self.highlightedSquare[1] = self.highlightedSquare[0];
                 self.highlightedSquare[2] = self.mousePiece;
                 self.highlightedSquare[0] = -1;
                 self.mousePiece = -1;
             } else if (self.mousePiece == -1 || self.board[self.mousePiece] == '0') {
-                list_clear(self.dotSquares);
+                list_clear(self.valid);
                 self.highlightedSquare[0] = -1;
                 self.mousePiece = -1;
             } else {
@@ -1223,8 +1275,12 @@ void mouse() {
                     self.highlightUnselect = 1;
                 }
                 self.highlightedSquare[0] = self.mousePiece;
-                generateLegalMoves(self.board, self.highlightedSquare[0], self.turn);
+                
+                list_free(self.valid);
+                self.valid = generateLegalMoves(self.board, self.highlightedSquare[0], self.turn);
             }
+            MUTEX_RELEASE(self.boardMutex);
+            MUTEX_RELEASE(self.validMutex);
         } else {
             /* mouse held */
             if (self.mousePiece != -1) {
@@ -1234,9 +1290,12 @@ void mouse() {
     } else {
         if (self.keys[KEYS_LMB] == 1) {
             self.keys[KEYS_LMB] = 0;
-            if (self.mousePiece == self.highlightedSquare[0] && list_find(self.dotSquares, (unitype) self.mouseSquare, 'c') >= 0) {
+            MUTEX_ACQUIRE(self.validMutex);
+            if (self.mousePiece == self.highlightedSquare[0] && list_find(self.valid, (unitype) self.mouseSquare, 'c') >= 0) {
                 /* make move */
+                MUTEX_ACQUIRE(self.boardMutex);
                 int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
+                MUTEX_RELEASE(self.boardMutex);
                 /* special: pawn promotion */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
                     self.pawnPromotionWhite = self.mouseSquare;
@@ -1245,14 +1304,15 @@ void mouse() {
                 } else {
                     self.turn = !self.turn;
                 }
-                list_clear(self.dotSquares);
+                list_clear(self.valid);
                 self.highlightedSquare[1] = self.highlightedSquare[0];
                 self.highlightedSquare[2] = self.mouseSquare;
                 self.highlightedSquare[0] = -1;
             } else if (self.mouseSquare == self.mousePiece && self.highlightUnselect) {
-                list_clear(self.dotSquares);
+                list_clear(self.valid);
                 self.highlightedSquare[0] = -1;
             }
+            MUTEX_RELEASE(self.validMutex);
             self.mousePiece = -1;
             self.highlightedSquareBox = -1;
             self.highlightUnselect = 0;
@@ -1261,7 +1321,9 @@ void mouse() {
     if (turtleKeyPressed(GLFW_KEY_SPACE)) {
         if (self.keys[KEYS_SPACE] == 0) {
             self.keys[KEYS_SPACE] = 1;
+            MUTEX_ACQUIRE(self.boardMutex);
             printBoard(self.board);
+            MUTEX_RELEASE(self.boardMutex);
         }
     } else {
         self.keys[KEYS_SPACE] = 0;
@@ -1277,7 +1339,9 @@ void parseRibbonOutput() {
         if (tt_ribbon.output[2] == 1) { // New
             list_clear(osToolsFileDialog.selectedFilenames);
             self.turn = CHESS_WHITE;
+            MUTEX_ACQUIRE(self.boardMutex);
             memcpy(self.board, "HCDEIDCHAAAAAAAA000000000000000000000000000000001111111183459438", 64);
+            MUTEX_RELEASE(self.boardMutex);
             self.mouseSquare = -1;
             self.mousePiece = -1;
             self.highlightedSquare[0] = -1;
@@ -1288,7 +1352,9 @@ void parseRibbonOutput() {
             self.pawnPromotionWhite = -1;
             self.pawnPromotionBlack = -1;
             self.pawnPromotionIndex = -1;
-            list_clear(self.dotSquares);
+            MUTEX_ACQUIRE(self.validMutex);
+            list_clear(self.valid);
+            MUTEX_RELEASE(self.validMutex);
         }
         if (tt_ribbon.output[2] == 2) { // Save
             if (osToolsFileDialog.selectedFilenames -> length == 0) {
