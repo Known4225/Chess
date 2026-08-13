@@ -908,7 +908,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
     for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
         for (int32_t positionIndex = 0; positionIndex < 64; positionIndex++) {
-            if (moves -> data[movesIndex + MOVES_STRING].s[position + 1] == BLANK_SPACE) {
+            if (moves -> data[movesIndex + MOVES_STRING].s[positionIndex + 1] == BLANK_SPACE) {
                 continue;
             }
             list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_STRING].s + 1, positionIndex, !turn);
@@ -930,7 +930,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
         if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r != NULL) {
             for (int32_t extra = 0; extra < moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> length; extra++) {
                 for (int32_t positionIndex = 0; positionIndex < 64; positionIndex++) {
-                    if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[position + 1] == BLANK_SPACE) {
+                    if (moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[positionIndex + 1] == BLANK_SPACE) {
                         continue;
                     }
                     list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, positionIndex, !turn);
