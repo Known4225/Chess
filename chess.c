@@ -26,6 +26,9 @@ TODO:
 - Implement special stalemate conditions:
   - No capture in 50 moves
   - Threefold repetition
+- Graphical updates
+  - Cooler buttons
+  - Speech bubbles
 */
 
 #include "turtle.h"
@@ -571,15 +574,15 @@ void render() {
     MUTEX_RELEASE(self.boardMutex);
     /* render sidebar */
     setColor(CHESS_COLOR_BLACK_SQUARE);
-    turtleRoundedRectangle(self.boardX - self.boardSize - 30, self.boardY + self.boardSize, self.boardX - self.boardSize - 120, self.boardY + self.boardSize - 20, 5);
+    turtleRoundedRectangle(self.boardX - self.boardSize - 30, self.boardY + self.boardSize, self.boardX - self.boardSize - 110, self.boardY + self.boardSize - 20, 5);
     if (self.turn == CHESS_WHITE) {
         turtlePenColor(249, 249, 249);
         tt_setColor(TT_COLOR_WHITE);
-        turtleTextWriteString("Turn: White", self.boardX - self.boardSize - 75, self.boardY + self.boardSize - 10, 10, 50);
+        turtleTextWriteString("Turn: White", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
     } else {
         turtlePenColor(92, 89, 87);
         tt_setColor(TT_COLOR_BLACK);
-        turtleTextWriteString("Turn: Black", self.boardX - self.boardSize - 75, self.boardY + self.boardSize - 10, 10, 50);
+        turtleTextWriteString("Turn: Black", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
     }
     /* render pawn promotion */
     if (self.pawnPromotionWhite != -1) {
@@ -628,23 +631,66 @@ void render() {
         self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
         self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
         if (self.state == BOARD_STATE_CHECKMATE) {
-            
+            setColor(CHESS_COLOR_BLACK_SQUARE);
+            turtle.penr *= 0.8;
+            turtle.peng *= 0.8;
+            turtle.penb *= 0.8;
+            double offsetX = -230;
+            turtleRoundedRectangle(self.boardX - 50 + offsetX, self.boardY - 70, self.boardX + 50 + offsetX, self.boardY + 70, 5);
+            if (self.turn == CHESS_BLACK) {
+                tt_setColor(TT_COLOR_WHITE);
+            } else {
+                tt_setColor(TT_COLOR_BLACK);
+            }
+            turtleTextWriteString("Checkmate", self.boardX + offsetX, self.boardY + 50, 12, 50);
+            if (self.turn == CHESS_BLACK) {
+                turtleTexture(self.pieces[11], self.boardX - 12 + offsetX, self.boardY - 40, self.boardX + 8 + offsetX, self.boardY, 90);
+                turtleTexture(self.pieces[5], self.boardX + 20 + offsetX, self.boardY - 24, self.boardX - 20 + offsetX, self.boardY + 16, 0);
+                speechBubble(":(", self.boardX - 27 + offsetX, self.boardY - 8, 8, self.boardX - 20 + offsetX, self.boardY - 18, CHESS_BLACK);
+                speechBubble("!", self.boardX + 15 + offsetX, self.boardY + 21, 8, self.boardX + 10 + offsetX, self.boardY + 9, CHESS_WHITE);
+            } else {
+                turtleTexture(self.pieces[5], self.boardX - 8 + offsetX, self.boardY - 40, self.boardX + 12 + offsetX, self.boardY, -90);
+                turtleTexture(self.pieces[11], self.boardX + 20 + offsetX, self.boardY - 24, self.boardX - 20 + offsetX, self.boardY + 16, 0);
+                speechBubble(":(", self.boardX + 27 + offsetX, self.boardY - 8, 8, self.boardX + 20 + offsetX, self.boardY - 18, CHESS_WHITE);
+                speechBubble("!", self.boardX - 15 + offsetX, self.boardY + 21, 8, self.boardX - 10 + offsetX, self.boardY + 9, CHESS_BLACK);
+            }
         } else if (self.state == BOARD_STATE_STALEMATE) {
-            
+            setColor(CHESS_COLOR_BLACK_SQUARE);
+            turtle.penr *= 0.8;
+            turtle.peng *= 0.8;
+            turtle.penb *= 0.8;
+            double offsetX = -230;
+            turtleRoundedRectangle(self.boardX - 50 + offsetX, self.boardY - 70, self.boardX + 50 + offsetX, self.boardY + 70, 5);
+            tt_setColor(TT_COLOR_WHITE);
+            turtleTextWriteString("Stalemate", self.boardX + offsetX, self.boardY + 50, 12, 50);
+            turtleTexture(self.pieces[11], self.boardX - 45 + offsetX, self.boardY - 30, self.boardX - 5 + offsetX, self.boardY + 10, 0);
+            turtleTexture(self.pieces[5], self.boardX + 45 + offsetX, self.boardY - 30, self.boardX + 5 + offsetX, self.boardY + 10, 0);
+            speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK);
+            speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE);
         }
+    } else if (self.state == BOARD_STATE_CHECK) {
+        if (self.turn == CHESS_WHITE) {
+            tt_setColor(TT_COLOR_BLACK);
+            turtlePenColor(92, 89, 87);
+        } else {
+            tt_setColor(TT_COLOR_WHITE);
+            turtlePenColor(249, 249, 249);
+        }
+        double x1 = self.boardX - self.boardSize - 5;
+        double y1 = self.boardY + self.boardSize;
+        double x2 = self.boardX - self.boardSize - 25;
+        double y2 = self.boardY + self.boardSize - 20;
+        turtleRectangle(x1, y1, x2, y2);
+        turtlePenSize(1);
+        if (self.turn == CHESS_WHITE) {
+            tt_setColor(TT_COLOR_WHITE);
+            turtlePenColor(249, 249, 249);
+        } else {
+            tt_setColor(TT_COLOR_BLACK);
+            turtlePenColor(92, 89, 87);
+        }
+        turtleTriangle(x1, y1, x2, y2, x1, y2);
     }
-    setColor(CHESS_COLOR_BLACK_SQUARE);
-    turtle.penr *= 0.8;
-    turtle.peng *= 0.8;
-    turtle.penb *= 0.8;
-    double offsetX = -230;
-    turtleRoundedRectangle(self.boardX - 50 + offsetX, self.boardY - 70, self.boardX + 50 + offsetX, self.boardY + 70, 5);
-    tt_setColor(TT_COLOR_WHITE);
-    turtleTextWriteString("Stalemate", self.boardX + offsetX, self.boardY + 50, 12, 50);
-    turtleTexture(self.pieces[11], self.boardX - 45 + offsetX, self.boardY - 30, self.boardX - 5 + offsetX, self.boardY + 10, 0);
-    turtleTexture(self.pieces[5], self.boardX + 45 + offsetX, self.boardY - 30, self.boardX + 5 + offsetX, self.boardY + 10, 0);
-    speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK);
-    speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE);
 
     /* engine buttons */
     if (self.mohamed -> value) {
@@ -1278,7 +1324,6 @@ list_t *generateAllMoves(char *board, int8_t turn) {
         }
         SECOND_PASS_NEXT:;
     }
-    printf("Number of moves: %d\n", moves -> length / MOVES_NUMBER_OF_FIELDS);
     return moves;
 }
 
