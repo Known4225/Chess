@@ -1,24 +1,24 @@
 #include <stdlib.h>
 
-#define BLANK_SPACE                     0x30
-#define WHITE_PAWN                      0x31
-#define WHITE_ROOK                      0x32
-#define WHITE_KNIGHT                    0x33
-#define WHITE_BISHOP                    0x34
-#define WHITE_QUEEN                     0x35
-#define WHITE_KING                      0x36
-#define WHITE_PAWN_TWO_SQUARES          0x37
-#define WHITE_ROOK_UNMOVED              0x38
-#define WHITE_KING_UNMOVED              0x39
-#define BLACK_PAWN                      0x41
-#define BLACK_ROOK                      0x42
-#define BLACK_KNIGHT                    0x43
-#define BLACK_BISHOP                    0x44
-#define BLACK_QUEEN                     0x45
-#define BLACK_KING                      0x46
-#define BLACK_PAWN_TWO_SQUARES          0x47
-#define BLACK_ROOK_UNMOVED              0x48
-#define BLACK_KING_UNMOVED              0x49
+#define BLANK_SPACE                     '0'
+#define WHITE_PAWN                      '1'
+#define WHITE_ROOK                      '2'
+#define WHITE_KNIGHT                    '3'
+#define WHITE_BISHOP                    '4'
+#define WHITE_QUEEN                     '5'
+#define WHITE_KING                      '6'
+#define WHITE_PAWN_TWO_SQUARES          '7'
+#define WHITE_ROOK_UNMOVED              '8'
+#define WHITE_KING_UNMOVED              '9'
+#define BLACK_PAWN                      'A'
+#define BLACK_ROOK                      'B'
+#define BLACK_KNIGHT                    'C'
+#define BLACK_BISHOP                    'D'
+#define BLACK_QUEEN                     'E'
+#define BLACK_KING                      'F'
+#define BLACK_PAWN_TWO_SQUARES          'G'
+#define BLACK_ROOK_UNMOVED              'H'
+#define BLACK_KING_UNMOVED              'I'
 
 char queens_gambit[66] = {'b',
                           'H', 'C', 'D', 'E', 'I', 'D', 'C', 'H',
