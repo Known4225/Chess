@@ -161,6 +161,7 @@ typedef struct {
     int8_t pawnPromotionIndex;
     volatile int8_t boardMutex; // data access on self.board
     volatile int8_t validMutex; // data access on self.valid
+    int8_t state; // BOARD_STATE_X
 
     /* board */
     double boardX;
@@ -195,6 +196,7 @@ void init() {
     self.valid = list_init();
     self.boardMutex = 0;
     self.validMutex = 0;
+    self.state = BOARD_STATE_NONE;
 
     /* textures */
     char *constructedFilepath = malloc(5120);
@@ -549,6 +551,21 @@ void render() {
     } else {
         self.mohamed -> enabled = TT_ELEMENT_ENABLED;
         self.ryan -> enabled = TT_ELEMENT_ENABLED;
+    }
+    if (self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
+        self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
+        if (self.state == BOARD_STATE_CHECKMATE) {
+            if (self.turn == CHESS_WHITE) {
+                tt_setColor(TT_COLOR_BLACK);
+            } else {
+                tt_setColor(TT_COLOR_WHITE);
+            }
+            turtleTextWriteString("Checkmate", self.boardX, self.boardY, 50, 50);
+        } else if (self.state == BOARD_STATE_STALEMATE) {
+            tt_setColor(TT_COLOR_DARK_GREY);
+            turtleTextWriteString("STALEMATE", self.boardX, self.boardY, 50, 50);
+        }
     }
 
     /* engine buttons */
@@ -1048,92 +1065,93 @@ list_t *generateAllMoves(char *board, int8_t turn) {
     list_t *moves = list_init();
     /* computation */
     for (int32_t position = 0; position < 64; position++) {
-        if (board[position] != BLANK_SPACE) {
-            list_t *naive = generateNaiveMoves(board, position, turn);
-            char boardCopy[66];
-            boardCopy[65] = '\0';
-            for (int32_t i = 0; i < naive -> length; i++) {
-                if (turn == CHESS_WHITE) {
-                    boardCopy[0] = 'b';
-                } else {
-                    boardCopy[0] = 'w';
-                }
-                memcpy(boardCopy + 1, board, 64);
-                int32_t move = movePiece(boardCopy + 1, position, naive -> data[i].c);
-                /* check results */
-                if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
-                    char promotionOptions[4] = {WHITE_QUEEN, WHITE_KNIGHT, WHITE_ROOK, WHITE_BISHOP};
-                    for (int32_t j = 0; j < 4; j++) {
-                        boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
-                        list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                        list_append(moves, (unitype) position, 'c'); // MOVES_FROM
-                        list_append(moves, naive -> data[i], 'c'); // MOVES_TO
-                        list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
-                    }
-                } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-                    char promotionOptions[4] = {BLACK_QUEEN, BLACK_KNIGHT, BLACK_ROOK, BLACK_BISHOP};
-                    for (int32_t j = 0; j < 4; j++) {
-                        boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
-                        list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                        list_append(moves, (unitype) position, 'c'); // MOVES_FROM
-                        list_append(moves, naive -> data[i], 'c'); // MOVES_TO
-                        list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
-                    }
-                } else if (move == MOVE_PIECE_CASTLE_WHITE) {
-                    list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                    list_append(moves, (unitype) position, 'c'); // MOVES_FROM
-                    list_append(moves, naive -> data[i], 'c'); // MOVES_TO
-                    list_t *extraChecks = list_init();
-                    if (naive -> data[i].c == 62) {
-                        /* white right castle */
-                        boardCopy[63 + 1] = WHITE_ROOK; // revert rook
-                        boardCopy[62 + 1] = BLANK_SPACE; // revert king
-                        boardCopy[61 + 1] = WHITE_KING; // king walk
-                        list_append(extraChecks, (unitype) boardCopy, 's');
-                    } else {
-                        /* white left castle */
-                        boardCopy[56 + 1] = WHITE_ROOK; // revert rook
-                        boardCopy[57 + 1] = BLANK_SPACE; // revert king
-                        boardCopy[59 + 1] = WHITE_KING; // king walk
-                        list_append(extraChecks, (unitype) boardCopy, 's');
-                        boardCopy[59 + 1] = BLANK_SPACE; // revert king
-                        boardCopy[58 + 1] = WHITE_KING; // king walk
-                        list_append(extraChecks, (unitype) boardCopy, 's');
-                    }
-                    list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
-                } else if (move == MOVE_PIECE_CASTLE_BLACK) {
-                    list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
-                    list_append(moves, (unitype) position, 'c'); // MOVES_FROM
-                    list_append(moves, naive -> data[i], 'c'); // MOVES_TO
-                    list_t *extraChecks = list_init();
-                    if (naive -> data[i].c == 6) {
-                        /* black right castle */
-                        boardCopy[7 + 1] = WHITE_ROOK; // revert rook
-                        boardCopy[6 + 1] = BLANK_SPACE; // revert king
-                        boardCopy[5 + 1] = WHITE_KING; // king walk
-                        list_append(extraChecks, (unitype) boardCopy, 's');
-                    } else {
-                        /* black left castle */
-                        boardCopy[0 + 1] = WHITE_ROOK; // revert rook
-                        boardCopy[1 + 1] = BLANK_SPACE; // revert king
-                        boardCopy[3 + 1] = WHITE_KING; // king walk
-                        list_append(extraChecks, (unitype) boardCopy, 's');
-                        boardCopy[3 + 1] = BLANK_SPACE; // revert king
-                        boardCopy[2 + 1] = WHITE_KING; // king walk
-                        list_append(extraChecks, (unitype) boardCopy, 's');
-                    }
-                    list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
-                } else if (move == MOVE_PIECE_SUCCESSFUL) {
+        if (board[position] == BLANK_SPACE) {
+            continue;
+        }
+        list_t *naive = generateNaiveMoves(board, position, turn);
+        char boardCopy[66];
+        boardCopy[65] = '\0';
+        for (int32_t i = 0; i < naive -> length; i++) {
+            if (turn == CHESS_WHITE) {
+                boardCopy[0] = 'b';
+            } else {
+                boardCopy[0] = 'w';
+            }
+            memcpy(boardCopy + 1, board, 64);
+            int32_t move = movePiece(boardCopy + 1, position, naive -> data[i].c);
+            /* check results */
+            if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
+                char promotionOptions[4] = {WHITE_QUEEN, WHITE_KNIGHT, WHITE_ROOK, WHITE_BISHOP};
+                for (int32_t j = 0; j < 4; j++) {
+                    boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
                     list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
                     list_append(moves, (unitype) position, 'c'); // MOVES_FROM
                     list_append(moves, naive -> data[i], 'c'); // MOVES_TO
                     list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
-                } else {
-                    printf("ERROR: movePiece returned MOVE_PIECE_ERROR\n");
                 }
+            } else if (move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
+                char promotionOptions[4] = {BLACK_QUEEN, BLACK_KNIGHT, BLACK_ROOK, BLACK_BISHOP};
+                for (int32_t j = 0; j < 4; j++) {
+                    boardCopy[naive -> data[i].c + 1] = promotionOptions[j];
+                    list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                    list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                    list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                    list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+                }
+            } else if (move == MOVE_PIECE_CASTLE_WHITE) {
+                list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                list_t *extraChecks = list_init();
+                if (naive -> data[i].c == 62) {
+                    /* white right castle */
+                    boardCopy[63 + 1] = WHITE_ROOK; // revert rook
+                    boardCopy[62 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[61 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                } else {
+                    /* white left castle */
+                    boardCopy[56 + 1] = WHITE_ROOK; // revert rook
+                    boardCopy[57 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[59 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                    boardCopy[59 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[58 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                }
+                list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
+            } else if (move == MOVE_PIECE_CASTLE_BLACK) {
+                list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                list_t *extraChecks = list_init();
+                if (naive -> data[i].c == 6) {
+                    /* black right castle */
+                    boardCopy[7 + 1] = WHITE_ROOK; // revert rook
+                    boardCopy[6 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[5 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                } else {
+                    /* black left castle */
+                    boardCopy[0 + 1] = WHITE_ROOK; // revert rook
+                    boardCopy[1 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[3 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                    boardCopy[3 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[2 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                }
+                list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
+            } else if (move == MOVE_PIECE_SUCCESSFUL) {
+                list_append(moves, (unitype) boardCopy, 's'); // MOVES_STRING
+                list_append(moves, (unitype) position, 'c'); // MOVES_FROM
+                list_append(moves, naive -> data[i], 'c'); // MOVES_TO
+                list_append(moves, (unitype) NULL, 'l'); // MOVES_EXTRA_CHECKS
+            } else {
+                printf("ERROR: movePiece returned MOVE_PIECE_ERROR\n");
             }
-            list_free(naive);
         }
+        list_free(naive);
     }
     /* second pass - validate legal moves are legal (don't put king in check, etc) */
     for (int32_t movesIndex = 0; movesIndex < moves -> length; movesIndex += MOVES_NUMBER_OF_FIELDS) {
@@ -1144,7 +1162,7 @@ list_t *generateAllMoves(char *board, int8_t turn) {
             list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_STRING].s + 1, position, !turn);
             for (int32_t i = 0; i < simulated -> length; i++) {
                 char capturedPiece = moves -> data[movesIndex + MOVES_STRING].s[simulated -> data[i].c + 1];
-                if (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE || capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE) {
+                if ((turn == CHESS_WHITE && (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE)) || (turn == CHESS_BLACK && (capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE))) {
                     /* this moves captures the king, invalidate the legal move */
                     for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                         list_delete(moves, movesIndex);
@@ -1166,7 +1184,7 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                     list_t *simulated = generateNaiveMoves(moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s + 1, position, !turn);
                     for (int32_t i = 0; i < simulated -> length; i++) {
                         char capturedPiece = moves -> data[movesIndex + MOVES_EXTRA_CHECKS].r -> data[extra].s[simulated -> data[i].c + 1];
-                        if (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE || capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE) {
+                        if ((turn == CHESS_WHITE && (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE)) || (turn == CHESS_BLACK && (capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE))) {
                             /* this moves captures the king, invalidate the legal move */
                             for (int32_t j = 0; j < MOVES_NUMBER_OF_FIELDS; j++) {
                                 list_delete(moves, movesIndex);
@@ -1190,7 +1208,19 @@ list_t *generateAllMoves(char *board, int8_t turn) {
 int32_t checkBoardState(char *board, int8_t turn) {
     /* check for check */
     int8_t check = 0;
-
+    for (int32_t position = 0; position < 64; position++) {
+        if (board[position] == BLANK_SPACE) {
+            continue;
+        }
+        list_t *naive = generateNaiveMoves(board, position, !turn);
+        for (int32_t i = 0; i < naive -> length; i++) {
+            char capturedPiece = board[naive -> data[i].i];
+            if ((turn == CHESS_WHITE && (capturedPiece == WHITE_KING || capturedPiece == WHITE_KING_NO_MOVE)) || (turn == CHESS_BLACK && (capturedPiece == BLACK_KING || capturedPiece == BLACK_KING_NO_MOVE))) {
+                check = 1;
+                break;
+            }
+        }
+    }
     /* check for stalemate */
     int8_t stalemate = 0;
     list_t *moves = generateAllMoves(board, turn);
@@ -1286,13 +1316,13 @@ int32_t engineMove(char *engineName) {
     self.mousePiece = -1;
     self.turn = !self.turn;
     list_free(moves);
-    checkBoardState(self.board, self.turn);
+    self.state = checkBoardState(self.board, self.turn);
     MUTEX_RELEASE(self.boardMutex);
     return 0;
 }
 
 void mouse() {
-    if (self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) {
+    if (self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1 || self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
         self.mouseSquare = -1;           
     }
     if (turtleMouseDown()) {
@@ -1311,7 +1341,7 @@ void mouse() {
                     self.pawnPromotionBlack = -1;
                 }
                 self.turn = !self.turn;
-                checkBoardState(self.board, self.turn);
+                self.state = checkBoardState(self.board, self.turn);
                 MUTEX_RELEASE(self.boardMutex);
                 return;
             }
@@ -1335,7 +1365,7 @@ void mouse() {
                 self.highlightedSquare[0] = -1;
                 self.mousePiece = -1;
                 if (move != MOVE_PIECE_PAWN_PROMOTION_WHITE && move != MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-                    checkBoardState(self.board, self.turn);
+                    self.state = checkBoardState(self.board, self.turn);
                 }
             } else if (self.mousePiece == -1 || self.board[self.mousePiece] == BLANK_SPACE) {
                 list_clear(self.valid);
@@ -1378,7 +1408,7 @@ void mouse() {
                 self.highlightedSquare[2] = self.mouseSquare;
                 self.highlightedSquare[0] = -1;
                 if (move != MOVE_PIECE_PAWN_PROMOTION_WHITE && move != MOVE_PIECE_PAWN_PROMOTION_BLACK) {
-                    checkBoardState(self.board, self.turn);
+                    self.state = checkBoardState(self.board, self.turn);
                 }
                 MUTEX_RELEASE(self.boardMutex);
             } else if (self.mouseSquare == self.mousePiece && self.highlightUnselect) {
@@ -1428,6 +1458,7 @@ void parseRibbonOutput() {
             MUTEX_ACQUIRE(self.validMutex);
             list_clear(self.valid);
             MUTEX_RELEASE(self.validMutex);
+            self.state = BOARD_STATE_NONE;
         }
         if (tt_ribbon.output[2] == 2) { // Save
             if (osToolsFileDialog.selectedFilenames -> length == 0) {
