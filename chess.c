@@ -24,7 +24,6 @@ I - black king that hasn't moved               (0x49)
 
 TODO:
 - Implement special stalemate conditions:
-  - No capture in 50 moves
   - Threefold repetition
 - Graphical updates
   - Cooler buttons
@@ -171,6 +170,7 @@ typedef struct {
     volatile int8_t validMutex; // data access on self.valid
     int8_t state; // BOARD_STATE_X
     tt_button_t *newGame; // new game button
+    int32_t movesSinceCapture;
 
     /* engines */
     char inputFilename[4096];
@@ -213,6 +213,7 @@ void init() {
     self.newGame -> color[TT_COLOR_SLOT_BUTTON_CLICKED] = TT_COLOR_BLACK_ALTERNATE;
     self.newGame -> color[TT_COLOR_SLOT_BUTTON_TEXT] = TT_COLOR_WHITE;
     self.newGame -> color[TT_COLOR_SLOT_BUTTON_SELECTED_TEXT] = TT_COLOR_WHITE;
+    self.movesSinceCapture = 0;
 
     /* textures */
     char *constructedFilepath = malloc(5120);
@@ -371,6 +372,7 @@ void newGame() {
     list_clear(self.valid);
     MUTEX_RELEASE(self.validMutex);
     self.state = BOARD_STATE_NONE;
+    self.movesSinceCapture = 0;
 }
 
 /* import a file to board - TODO */
@@ -1395,6 +1397,8 @@ int32_t checkBoardState(char *board, int8_t turn) {
         return BOARD_STATE_STALEMATE;
     } else if (check) {
         return BOARD_STATE_CHECK;
+    } else if (self.movesSinceCapture >= 50) {
+        return BOARD_STATE_STALEMATE;
     }
     return BOARD_STATE_NONE;
 }
@@ -1463,6 +1467,10 @@ int32_t engineMove(char *engineName) {
     }
     /* make move */
     MUTEX_ACQUIRE(self.boardMutex);
+    self.movesSinceCapture++;
+    if (self.board[moves -> data[found + MOVES_TO].c] != BLANK_SPACE) {
+        self.movesSinceCapture = 0;
+    }
     int32_t move = movePiece(self.board, moves -> data[found + MOVES_FROM].c, moves -> data[found + MOVES_TO].c);
     /* check for pawn promotion */
     if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE || move == MOVE_PIECE_PAWN_PROMOTION_BLACK) {
@@ -1511,6 +1519,10 @@ void mouse() {
             MUTEX_ACQUIRE(self.boardMutex);
             if (self.mousePiece != -1 && list_find(self.valid, (unitype) self.mousePiece, 'c') >= 0) {
                 /* make move */
+                self.movesSinceCapture++;
+                if (self.board[self.mousePiece] != BLANK_SPACE) {
+                    self.movesSinceCapture = 0;
+                }
                 int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mousePiece);
                 /* check for pawn promotion */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
@@ -1554,8 +1566,12 @@ void mouse() {
             MUTEX_ACQUIRE(self.validMutex);
             if (self.mousePiece == self.highlightedSquare[0] && list_find(self.valid, (unitype) self.mouseSquare, 'c') >= 0) {
                 /* make move */
+                if (self.board[self.mouseSquare] != BLANK_SPACE) {
+                    self.movesSinceCapture = 0;
+                }
                 MUTEX_ACQUIRE(self.boardMutex);
                 int32_t move = movePiece(self.board, self.highlightedSquare[0], self.mouseSquare);
+                self.movesSinceCapture++;
                 /* special: pawn promotion */
                 if (move == MOVE_PIECE_PAWN_PROMOTION_WHITE) {
                     self.pawnPromotionWhite = self.mouseSquare;
@@ -1681,6 +1697,7 @@ int main(int argc, char *argv[]) {
         turtleToolsUpdate(); // update turtleTools
         tt_setColor(TT_COLOR_TEXT);
         turtleTextWriteStringf(-310, -170, 5, 0, "%.2lf, %.2lf", turtle.mouseX, turtle.mouseY);
+        turtleTextWriteStringf(310, -170, 5, 100, "%d", self.movesSinceCapture);
         parseRibbonOutput(); // user defined function to use ribbon
         turtleUpdate(); // update the screen
         end = clock();
