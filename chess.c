@@ -272,6 +272,74 @@ void setColor(int32_t color) {
     turtlePenColorAlpha(colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 0], colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 1], colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 2], colors[self.theme * CHESS_COLOR_NUMBER * 4 + color * 4 + 3]);
 }
 
+void turtleRoundedRectangle(double x1, double y1, double x2, double y2, double radius) {
+    if (x1 > x2) {
+        double temp = x1;
+        x1 = x2;
+        x2 = temp;
+    }
+    if (y1 > y2) {
+        double temp = y1;
+        y1 = y2;
+        y2 = temp;
+    }
+    turtlePenSize(radius * 2);
+    turtleGoto(x1 + radius, y1 + radius);
+    turtlePenDown();
+    turtleGoto(x1 + radius, y2 - radius);
+    turtleGoto(x2 - radius, y2 - radius);
+    turtleGoto(x2 - radius, y1 + radius);
+    turtleGoto(x1 + radius, y1 + radius);
+    turtlePenUp();
+    turtleRectangle(x1 + radius, y1 + radius, x2 - radius, y2 - radius);
+}
+
+void speechBubble(char *text, double x, double y, double size, double originX, double originY, int8_t color) {
+    char textCopy[1024];
+    strcpy_s(textCopy, 1024, text);
+    /* calculate width and height */
+    double maxLength = 0;
+    int32_t lines = 0;
+    char *ptr = strtok(textCopy, "\n");
+    while (ptr != NULL) {
+        double textLength = turtleTextGetUnicodeLength(ptr, size);
+        if (textLength > maxLength) {
+            maxLength = textLength;
+        }
+        ptr = strtok(NULL, "\n");
+        lines++;
+    }
+    maxLength += size / 1.3;
+    if (color == CHESS_WHITE) {
+        tt_setColor(TT_COLOR_WHITE);
+        turtlePenColor(249, 249, 249);
+    } else {
+        tt_setColor(TT_COLOR_BLACK);
+        // turtlePenColor(92, 89, 87);
+    }
+    double leading = size * 1.3;
+    double ypos = y + (lines - 1) / 2.0 * leading;
+    turtleRoundedRectangle(x - maxLength / 2, ypos + leading / 1.3, x + maxLength / 2, y - (lines - 1) / 2.0 * leading - leading / 1.3, size / 1.5);
+    double firstPointX = (y - originY) / 4 + x;
+    double firstPointY = (originX - x) / 4 + y;
+    double thirdPointX = (originY - y) / 4 + x;
+    double thirdPointY = (x - originX) / 4 + y;
+    turtleTriangle(firstPointX, firstPointY, originX, originY, thirdPointX, thirdPointY);
+    if (color == CHESS_WHITE) {
+        tt_setColor(TT_COLOR_BLACK);
+        // turtlePenColor(92, 89, 87);
+    } else {
+        tt_setColor(TT_COLOR_WHITE);
+        // turtlePenColor(249, 249, 249);
+    }
+    int32_t index = 0;
+    for (int32_t i = 0; i < lines; i++) {
+        turtleTextWriteUnicode(textCopy + index, x, ypos, size, 50);
+        index += strlen(textCopy + index) + 1;
+        ypos -= leading;
+    }
+}
+
 /* import a file to board - TODO */
 int32_t import(char *filename) {
     return -1;
@@ -502,12 +570,16 @@ void render() {
     }
     MUTEX_RELEASE(self.boardMutex);
     /* render sidebar */
+    setColor(CHESS_COLOR_BLACK_SQUARE);
+    turtleRoundedRectangle(self.boardX - self.boardSize - 30, self.boardY + self.boardSize, self.boardX - self.boardSize - 120, self.boardY + self.boardSize - 20, 5);
     if (self.turn == CHESS_WHITE) {
+        turtlePenColor(249, 249, 249);
         tt_setColor(TT_COLOR_WHITE);
-        turtleTextWriteString("Turn: White", self.boardX + self.boardSize + 10, self.boardY, 10, 0);
+        turtleTextWriteString("Turn: White", self.boardX - self.boardSize - 75, self.boardY + self.boardSize - 10, 10, 50);
     } else {
+        turtlePenColor(92, 89, 87);
         tt_setColor(TT_COLOR_BLACK);
-        turtleTextWriteString("Turn: Black", self.boardX + self.boardSize + 10, self.boardY, 10, 0);
+        turtleTextWriteString("Turn: Black", self.boardX - self.boardSize - 75, self.boardY + self.boardSize - 10, 10, 50);
     }
     /* render pawn promotion */
     if (self.pawnPromotionWhite != -1) {
@@ -556,17 +628,23 @@ void render() {
         self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
         self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
         if (self.state == BOARD_STATE_CHECKMATE) {
-            if (self.turn == CHESS_WHITE) {
-                tt_setColor(TT_COLOR_BLACK);
-            } else {
-                tt_setColor(TT_COLOR_WHITE);
-            }
-            turtleTextWriteString("Checkmate", self.boardX, self.boardY, 50, 50);
+            
         } else if (self.state == BOARD_STATE_STALEMATE) {
-            tt_setColor(TT_COLOR_DARK_GREY);
-            turtleTextWriteString("STALEMATE", self.boardX, self.boardY, 50, 50);
+            
         }
     }
+    setColor(CHESS_COLOR_BLACK_SQUARE);
+    turtle.penr *= 0.8;
+    turtle.peng *= 0.8;
+    turtle.penb *= 0.8;
+    double offsetX = -230;
+    turtleRoundedRectangle(self.boardX - 50 + offsetX, self.boardY - 70, self.boardX + 50 + offsetX, self.boardY + 70, 5);
+    tt_setColor(TT_COLOR_WHITE);
+    turtleTextWriteString("Stalemate", self.boardX + offsetX, self.boardY + 50, 12, 50);
+    turtleTexture(self.pieces[11], self.boardX - 45 + offsetX, self.boardY - 30, self.boardX - 5 + offsetX, self.boardY + 10, 0);
+    turtleTexture(self.pieces[5], self.boardX + 45 + offsetX, self.boardY - 30, self.boardX + 5 + offsetX, self.boardY + 10, 0);
+    speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK);
+    speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE);
 
     /* engine buttons */
     if (self.mohamed -> value) {
