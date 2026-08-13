@@ -308,7 +308,7 @@ void turtleRoundedRectangle(double x1, double y1, double x2, double y2, double r
 
 void speechBubble(char *text, double x, double y, double size, double originX, double originY, int8_t color) {
     char textCopy[1024];
-    strcpy_s(textCopy, 1024, text);
+    strcpy(textCopy, text);
     /* calculate width and height */
     double maxLength = 0;
     int32_t lines = 0;
@@ -1429,7 +1429,8 @@ int32_t engineMove(char *engineName) {
     fclose(inputfp);
     /* run engine */
     char *command = malloc(8192);
-    sprintf(command, "\"\"%s%s\" \"%s\" \"%s\"\"", osToolsFileDialog.executableFilepath, engineName, self.inputFilename, self.outputFilename); // idk why it needs to be double quoted
+    sprintf(command, "%s%s %s %s", osToolsFileDialog.executableFilepath, engineName, self.inputFilename, self.outputFilename); // idk why it needs to be double quoted
+    // sprintf(command, "\"\"%s%s\" \"%s\" \"%s\"\"", osToolsFileDialog.executableFilepath, engineName, self.inputFilename, self.outputFilename); // idk why it needs to be double quoted
     // printf("%s\n", command);
     int32_t status = system(command);
     free(command);
