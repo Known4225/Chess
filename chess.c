@@ -149,6 +149,11 @@ typedef struct {
     int8_t theme;
     int8_t keys[8];
 
+    /* board */
+    double boardX;
+    double boardY;
+    double boardSize;
+
     /* chess */
     chess_color_t turn;
     char board[64];
@@ -165,11 +170,7 @@ typedef struct {
     volatile int8_t boardMutex; // data access on self.board
     volatile int8_t validMutex; // data access on self.valid
     int8_t state; // BOARD_STATE_X
-
-    /* board */
-    double boardX;
-    double boardY;
-    double boardSize;
+    tt_button_t *newGame; // new game button
 
     /* engines */
     char inputFilename[4096];
@@ -181,7 +182,13 @@ typedef struct {
 chess_t self;
 
 void init() {
+    /* theme */
     self.theme = CHESS_THEME_CHESS_COM;
+
+    /* board */
+    self.boardX = -20;
+    self.boardY = -5;
+    self.boardSize = 160;
 
     /* chess */
     self.turn = CHESS_WHITE;
@@ -200,6 +207,12 @@ void init() {
     self.boardMutex = 0;
     self.validMutex = 0;
     self.state = BOARD_STATE_NONE;
+    self.newGame = tt_buttonInit("New Game", NULL, self.boardX - 230, self.boardY - 55, 10);
+    self.newGame -> color[TT_COLOR_SLOT_BUTTON] = TT_COLOR_BLACK_ALTERNATE;
+    self.newGame -> color[TT_COLOR_SLOT_BUTTON_SELECT] = TT_COLOR_DARK_GREY;
+    self.newGame -> color[TT_COLOR_SLOT_BUTTON_CLICKED] = TT_COLOR_BLACK_ALTERNATE;
+    self.newGame -> color[TT_COLOR_SLOT_BUTTON_TEXT] = TT_COLOR_WHITE;
+    self.newGame -> color[TT_COLOR_SLOT_BUTTON_SELECTED_TEXT] = TT_COLOR_WHITE;
 
     /* textures */
     char *constructedFilepath = malloc(5120);
@@ -253,11 +266,6 @@ void init() {
     self.pieces[11] = turtleTextureLoad(constructedFilepath);
 
     free(constructedFilepath);
-
-    /* board */
-    self.boardX = -20;
-    self.boardY = -5;
-    self.boardSize = 160;
 
     /* engines */
     strcpy(self.inputFilename, osToolsFileDialog.executableFilepath);
@@ -341,6 +349,28 @@ void speechBubble(char *text, double x, double y, double size, double originX, d
         index += strlen(textCopy + index) + 1;
         ypos -= leading;
     }
+}
+
+void newGame() {
+    list_clear(osToolsFileDialog.selectedFilenames);
+    self.turn = CHESS_WHITE;
+    MUTEX_ACQUIRE(self.boardMutex);
+    memcpy(self.board, "HCDEIDCHAAAAAAAA000000000000000000000000000000001111111183459438", 64);
+    MUTEX_RELEASE(self.boardMutex);
+    self.mouseSquare = -1;
+    self.mousePiece = -1;
+    self.highlightedSquare[0] = -1;
+    self.highlightedSquare[1] = -1;
+    self.highlightedSquare[2] = -1;
+    self.highlightedSquareBox = -1;
+    self.highlightUnselect = 0;
+    self.pawnPromotionWhite = -1;
+    self.pawnPromotionBlack = -1;
+    self.pawnPromotionIndex = -1;
+    MUTEX_ACQUIRE(self.validMutex);
+    list_clear(self.valid);
+    MUTEX_RELEASE(self.validMutex);
+    self.state = BOARD_STATE_NONE;
 }
 
 /* import a file to board - TODO */
@@ -630,6 +660,7 @@ void render() {
     if (self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
         self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
         self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.newGame -> enabled = TT_ELEMENT_ENABLED;
         if (self.state == BOARD_STATE_CHECKMATE) {
             setColor(CHESS_COLOR_BLACK_SQUARE);
             turtle.penr *= 0.8;
@@ -668,7 +699,10 @@ void render() {
             speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK);
             speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE);
         }
-    } else if (self.state == BOARD_STATE_CHECK) {
+    } else {
+        self.newGame -> enabled = TT_ELEMENT_HIDE;
+    }
+    if (self.state == BOARD_STATE_CHECK || self.state == BOARD_STATE_CHECKMATE) {
         if (self.turn == CHESS_WHITE) {
             tt_setColor(TT_COLOR_BLACK);
             turtlePenColor(92, 89, 87);
@@ -690,6 +724,10 @@ void render() {
             turtlePenColor(92, 89, 87);
         }
         turtleTriangle(x1, y1, x2, y2, x1, y2);
+    }
+    if (self.newGame -> value) {
+        self.newGame -> value = 0;
+        newGame();
     }
 
     /* engine buttons */
@@ -1563,25 +1601,7 @@ void parseRibbonOutput() {
     tt_ribbon.output[0] = 0;
     if (tt_ribbon.output[1] == 0) { // File
         if (tt_ribbon.output[2] == 1) { // New
-            list_clear(osToolsFileDialog.selectedFilenames);
-            self.turn = CHESS_WHITE;
-            MUTEX_ACQUIRE(self.boardMutex);
-            memcpy(self.board, "HCDEIDCHAAAAAAAA000000000000000000000000000000001111111183459438", 64);
-            MUTEX_RELEASE(self.boardMutex);
-            self.mouseSquare = -1;
-            self.mousePiece = -1;
-            self.highlightedSquare[0] = -1;
-            self.highlightedSquare[1] = -1;
-            self.highlightedSquare[2] = -1;
-            self.highlightedSquareBox = -1;
-            self.highlightUnselect = 0;
-            self.pawnPromotionWhite = -1;
-            self.pawnPromotionBlack = -1;
-            self.pawnPromotionIndex = -1;
-            MUTEX_ACQUIRE(self.validMutex);
-            list_clear(self.valid);
-            MUTEX_RELEASE(self.validMutex);
-            self.state = BOARD_STATE_NONE;
+            newGame();
         }
         if (tt_ribbon.output[2] == 2) { // Save
             if (osToolsFileDialog.selectedFilenames -> length == 0) {
