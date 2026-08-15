@@ -113,8 +113,10 @@ typedef struct {
     /* engines */
     char inputFilename[4096];
     char outputFilename[4096];
-    tt_button_t *mohamed;
-    tt_button_t *ryan;
+    tt_button_t *mohamedButton;
+    tt_button_t *ryanButton;
+    turtle_texture_t mohamedImage;
+    turtle_texture_t ryanImage;
 } chess_t;
 
 chess_t self;
@@ -205,7 +207,6 @@ void init() {
     strcat(constructedFilepath, "pieces/black-king.png");
     self.pieces[11] = turtleTextureLoad(constructedFilepath);
 
-    free(constructedFilepath);
 
     /* engines */
     strcpy(self.inputFilename, osToolsFileDialog.executableFilepath);
@@ -213,10 +214,18 @@ void init() {
     strcpy(self.outputFilename, osToolsFileDialog.executableFilepath);
     strcat(self.outputFilename, "output.txt");
 
-    self.mohamed = tt_buttonInit("Mohamed", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 9, 10);
-    self.mohamed -> align = TT_BUTTON_ALIGN_LEFT;
-    self.ryan = tt_buttonInit("Ryan", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 36, 10);
-    self.ryan -> align = TT_BUTTON_ALIGN_LEFT;
+    self.mohamedButton = tt_buttonInit("Mohamed", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 9, 10);
+    self.mohamedButton -> align = TT_BUTTON_ALIGN_LEFT;
+    self.ryanButton = tt_buttonInit("Ryan", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 36, 10);
+    self.ryanButton -> align = TT_BUTTON_ALIGN_LEFT;
+
+    strcpy(constructedFilepath, osToolsFileDialog.executableFilepath);
+    strcat(constructedFilepath, "images/anonymous.jpg");
+    self.mohamedImage = turtleTextureLoad(constructedFilepath);
+    strcpy(constructedFilepath, osToolsFileDialog.executableFilepath);
+    strcat(constructedFilepath, "images/anonymous.jpg");
+    self.ryanImage = turtleTextureLoad(constructedFilepath);
+    free(constructedFilepath);
 }
 
 void setColor(int32_t color) {
@@ -518,15 +527,15 @@ void render() {
         }
     }
     if (self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) {
-        self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
-        self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.mohamedButton -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.ryanButton -> enabled = TT_ELEMENT_NO_MOUSE;
     } else {
-        self.mohamed -> enabled = TT_ELEMENT_ENABLED;
-        self.ryan -> enabled = TT_ELEMENT_ENABLED;
+        self.mohamedButton -> enabled = TT_ELEMENT_ENABLED;
+        self.ryanButton -> enabled = TT_ELEMENT_ENABLED;
     }
     if (self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
-        self.mohamed -> enabled = TT_ELEMENT_NO_MOUSE;
-        self.ryan -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.mohamedButton -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.ryanButton -> enabled = TT_ELEMENT_NO_MOUSE;
         self.newGame -> enabled = TT_ELEMENT_ENABLED;
         if (self.state == BOARD_STATE_CHECKMATE) {
             setColor(CHESS_COLOR_BLACK_SQUARE);
@@ -598,15 +607,15 @@ void render() {
     }
 
     /* engine buttons */
-    if (self.mohamed -> value) {
-        self.mohamed -> value = 0;
+    if (self.mohamedButton -> value) {
+        self.mohamedButton -> value = 0;
         int32_t status = engineMove("mohamed.exe");
         if (status != 0) {
 
         }
     }
-    if (self.ryan -> value) {
-        self.ryan -> value = 0;
+    if (self.ryanButton -> value) {
+        self.ryanButton -> value = 0;
         int32_t status = engineMove("ryan.exe");
         if (status != 0) {
 
