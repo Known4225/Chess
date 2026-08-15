@@ -44,7 +44,7 @@ double randomDouble(double lowerBound, double upperBound) { // random double bet
 
 int main(int argc, char *argv[]) {
     /* set strategy */
-    self.strategy = ENGINE_STRATEGY_RANDOM;
+    self.strategy = ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES;
     /* go */
     if (argc != 3) {
         ERROR_PRINT("Expected 3 arguments, got %d\n", argc);
@@ -66,6 +66,7 @@ int main(int argc, char *argv[]) {
         list_append(self.moves, (unitype) line, 's');
     }
     fclose(inputfp);
+    list_delete(self.moves, 0); // delete metadata
     if (self.moves -> length < 2) {
         ERROR_PRINT("No moves available\n");
         return -1;
@@ -79,7 +80,7 @@ int main(int argc, char *argv[]) {
         ERROR_PRINT("Unknown character '%c', expected 'w' or 'b'\n", self.moves -> data[0].s[0]);
         return -1;
     }
-    list_delete(self.moves, 0);
+    list_delete(self.moves, 0); // delete input board
     srand(time(NULL));
     int32_t status = 0;
     if (self.strategy == ENGINE_STRATEGY_RANDOM) {
@@ -113,9 +114,9 @@ int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves) {
 }
 
 int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves) {
-
+    return 0;
 }
 
 int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves) {
-
+    return 0;
 }
