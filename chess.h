@@ -418,6 +418,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
             list_t *extraChecks = list_init();
             if (naive -> data[i].c == 62) {
                 /* white right castle */
+                boardCopy[61 + 1] = BLANK_SPACE; // revert rook
                 boardCopy[63 + 1] = WHITE_ROOK; // revert rook
                 boardCopy[62 + 1] = BLANK_SPACE; // revert king
                 boardCopy[60 + 1] = WHITE_KING; // king walk
@@ -427,6 +428,7 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
                 list_append(extraChecks, (unitype) boardCopy, 's');
             } else {
                 /* white left castle */
+                boardCopy[58 + 1] = BLANK_SPACE; // revert rook
                 boardCopy[56 + 1] = WHITE_ROOK; // revert rook
                 boardCopy[57 + 1] = BLANK_SPACE; // revert king
                 boardCopy[60 + 1] = WHITE_KING; // king walk
@@ -446,24 +448,26 @@ list_t *generateLegalMoves(char *board, int8_t position, int8_t turn) {
             list_t *extraChecks = list_init();
             if (naive -> data[i].c == 6) {
                 /* black right castle */
-                boardCopy[7 + 1] = WHITE_ROOK; // revert rook
+                boardCopy[5 + 1] = BLANK_SPACE; // revert rook
+                boardCopy[7 + 1] = BLACK_ROOK; // revert rook
                 boardCopy[6 + 1] = BLANK_SPACE; // revert king
-                boardCopy[4 + 1] = WHITE_KING; // king walk
+                boardCopy[4 + 1] = BLACK_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
                 boardCopy[4 + 1] = BLANK_SPACE; // revert king
-                boardCopy[5 + 1] = WHITE_KING; // king walk
+                boardCopy[5 + 1] = BLACK_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             } else {
                 /* black left castle */
-                boardCopy[0 + 1] = WHITE_ROOK; // revert rook
+                boardCopy[2 + 1] = BLANK_SPACE; // revert rook
+                boardCopy[0 + 1] = BLACK_ROOK; // revert rook
                 boardCopy[1 + 1] = BLANK_SPACE; // revert king
-                boardCopy[4 + 1] = WHITE_KING; // king walk
+                boardCopy[4 + 1] = BLACK_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
                 boardCopy[4 + 1] = BLANK_SPACE; // revert king
-                boardCopy[3 + 1] = WHITE_KING; // king walk
+                boardCopy[3 + 1] = BLACK_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
                 boardCopy[3 + 1] = BLANK_SPACE; // revert king
-                boardCopy[2 + 1] = WHITE_KING; // king walk
+                boardCopy[2 + 1] = BLACK_KING; // king walk
                 list_append(extraChecks, (unitype) boardCopy, 's');
             }
             list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
@@ -660,14 +664,22 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                 list_t *extraChecks = list_init();
                 if (naive -> data[i].c == 62) {
                     /* white right castle */
+                    boardCopy[61 + 1] = BLANK_SPACE; // revert rook
                     boardCopy[63 + 1] = WHITE_ROOK; // revert rook
                     boardCopy[62 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[60 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                    boardCopy[60 + 1] = BLANK_SPACE; // revert king
                     boardCopy[61 + 1] = WHITE_KING; // king walk
                     list_append(extraChecks, (unitype) boardCopy, 's');
                 } else {
                     /* white left castle */
+                    boardCopy[58 + 1] = BLANK_SPACE; // revert rook
                     boardCopy[56 + 1] = WHITE_ROOK; // revert rook
                     boardCopy[57 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[60 + 1] = WHITE_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                    boardCopy[60 + 1] = BLANK_SPACE; // revert king
                     boardCopy[59 + 1] = WHITE_KING; // king walk
                     list_append(extraChecks, (unitype) boardCopy, 's');
                     boardCopy[59 + 1] = BLANK_SPACE; // revert king
@@ -682,18 +694,26 @@ list_t *generateAllMoves(char *board, int8_t turn) {
                 list_t *extraChecks = list_init();
                 if (naive -> data[i].c == 6) {
                     /* black right castle */
-                    boardCopy[7 + 1] = WHITE_ROOK; // revert rook
+                    boardCopy[5 + 1] = BLANK_SPACE; // revert rook
+                    boardCopy[7 + 1] = BLACK_ROOK; // revert rook
                     boardCopy[6 + 1] = BLANK_SPACE; // revert king
-                    boardCopy[5 + 1] = WHITE_KING; // king walk
+                    boardCopy[4 + 1] = BLACK_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                    boardCopy[4 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[5 + 1] = BLACK_KING; // king walk
                     list_append(extraChecks, (unitype) boardCopy, 's');
                 } else {
                     /* black left castle */
-                    boardCopy[0 + 1] = WHITE_ROOK; // revert rook
+                    boardCopy[2 + 1] = BLANK_SPACE; // revert rook
+                    boardCopy[0 + 1] = BLACK_ROOK; // revert rook
                     boardCopy[1 + 1] = BLANK_SPACE; // revert king
-                    boardCopy[3 + 1] = WHITE_KING; // king walk
+                    boardCopy[4 + 1] = BLACK_KING; // king walk
+                    list_append(extraChecks, (unitype) boardCopy, 's');
+                    boardCopy[4 + 1] = BLANK_SPACE; // revert king
+                    boardCopy[3 + 1] = BLACK_KING; // king walk
                     list_append(extraChecks, (unitype) boardCopy, 's');
                     boardCopy[3 + 1] = BLANK_SPACE; // revert king
-                    boardCopy[2 + 1] = WHITE_KING; // king walk
+                    boardCopy[2 + 1] = BLACK_KING; // king walk
                     list_append(extraChecks, (unitype) boardCopy, 's');
                 }
                 list_append(moves, (unitype) extraChecks, 'r'); // MOVES_EXTRA_CHECKS
