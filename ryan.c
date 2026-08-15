@@ -7,7 +7,7 @@ Strategies:
 */
 
 #define UNITYPE_LIST_IMPLEMENTATION
-#include "turtle.h"
+#include "chess.h"
 #include <time.h>
 
 #define ERROR_PRINT(fmt, ...) printf("ryan.exe ERROR: " fmt, ##__VA_ARGS__)
@@ -17,11 +17,6 @@ typedef enum {
     ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES = 2,
     ENGINE_STRATEGY_MAXIMISE_MOVES = 3,
 } engine_strategy_t;
-
-typedef enum {
-    CHESS_WHITE = 0,
-    CHESS_BLACK = 1,
-} chess_color_t;
 
 /* returns an index of moves, returns -1 if error */
 int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves);
@@ -108,6 +103,7 @@ int main(int argc, char *argv[]) {
     }
     fwrite(self.moves -> data[status].s, 1, 65, outputfp);
     fwrite("\n", 1, 1, outputfp);
+    fprintf(outputfp, "Hello World\n");
     fclose(outputfp);
     return 0;
 }
