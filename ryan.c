@@ -114,7 +114,28 @@ int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves) {
 }
 
 int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves) {
-    return 0;
+    int32_t minMoves = 1000000000;
+    list_t *opponentMoves = list_init();
+    for (int32_t move = 0; move < moves -> length; move++) {
+        list_t *possibleOpponentMoves = generateAllMoves(moves -> data[move].s + 1, !turn);
+        list_append(opponentMoves, (unitype) (possibleOpponentMoves -> length / MOVES_NUMBER_OF_FIELDS), 'i');
+        if ((possibleOpponentMoves -> length / MOVES_NUMBER_OF_FIELDS) < minMoves) {
+            minMoves = (possibleOpponentMoves -> length / MOVES_NUMBER_OF_FIELDS);
+        }
+        list_free(possibleOpponentMoves);
+    }
+    /* determine all moves that result in the opponent having minMoves */
+    list_t *moveIndex = list_init();
+    for (int32_t move = 0; move < opponentMoves -> length; move++) {
+        if (opponentMoves -> data[move].i == minMoves) {
+            list_append(moveIndex, (unitype) move, 'i');
+        }
+    }
+    list_free(opponentMoves);
+    int32_t randomIndex = randomInt(0, moveIndex -> length - 1);
+    int32_t pick = moveIndex -> data[randomIndex].i;
+    list_free(moveIndex);
+    return pick;
 }
 
 int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves) {
