@@ -26,7 +26,8 @@ TODO:
 - Implement special stalemate conditions:
   - Threefold repetition
 - Graphical updates
-  - Color lock engine options
+  - Engine pictures
+  - Support for more than two engines
 */
 
 #include "chess.h"
@@ -126,6 +127,8 @@ typedef struct {
     int8_t ryanButtonHover;
     turtle_texture_t mohamedImage;
     turtle_texture_t ryanImage;
+    tt_switch_t *mohamedColorLock[2];
+    tt_switch_t *ryanColorLock[2];
     int8_t speech;
     char speechContent[4096];
 } chess_t;
@@ -237,6 +240,16 @@ void init() {
     strcat(constructedFilepath, "images/anonymous.jpg");
     self.ryanImage = turtleTextureLoad(constructedFilepath);
     free(constructedFilepath);
+    self.mohamedColorLock[0] = tt_switchInit("White", NULL, 0, 0, 8);
+    self.mohamedColorLock[1] = tt_switchInit("Black", NULL, 0, 0, 8);
+    self.ryanColorLock[0] = tt_switchInit("White", NULL, 0, 0, 8);
+    self.ryanColorLock[1] = tt_switchInit("Black", NULL, 0, 0, 8);
+    for (int32_t i = 0; i < 2; i++) {
+        self.mohamedColorLock[i] -> style = TT_SWITCH_STYLE_CHECKBOX;
+        self.ryanColorLock[i] -> style = TT_SWITCH_STYLE_CHECKBOX;
+    }
+    self.mohamedColorLock[0] -> value = 1; // start as white
+    self.ryanColorLock[1] -> value = 1; // start as black
     self.speech = 0;
 }
 
@@ -605,8 +618,16 @@ void render() {
         self.mohamedButtonEnabled = 0;
         self.ryanButtonEnabled = 0;
     } else {
-        self.mohamedButtonEnabled = 1;
-        self.ryanButtonEnabled = 1;
+        if (self.mohamedColorLock[self.turn] -> value) {
+            self.mohamedButtonEnabled = 1;
+        } else {
+            self.mohamedButtonEnabled = 0;
+        }
+        if (self.ryanColorLock[self.turn] -> value) {
+            self.ryanButtonEnabled = 1;
+        } else {
+            self.ryanButtonEnabled = 0;
+        }
     }
     if (self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
         self.mohamedButtonEnabled = 0;
@@ -686,6 +707,14 @@ void render() {
     double buttonY = self.boardY + 30;
     double mohamedX = self.boardX + self.boardSize + 10;
     double ryanX = mohamedX + 87;
+    for (int32_t i = 0; i < 2; i++) {
+        self.mohamedColorLock[i] -> x = mohamedX + 20;
+        self.mohamedColorLock[i] -> y = buttonY - 24 - i * 12;
+        self.ryanColorLock[i] -> x = ryanX + 20;
+        self.ryanColorLock[i] -> y = buttonY - 24 - i * 12;
+    }
+    tt_setColor(TT_COLOR_TEXT);
+    turtleTextWriteString("Engines", (mohamedX + ryanX + buttonWidth) / 2, 150, 12, 50);
     uint8_t greyOut = 255;
     if (turtle.mouseX > mohamedX && turtle.mouseX < mohamedX + buttonWidth && turtle.mouseY > buttonY - 12 && turtle.mouseY < buttonY + buttonWidth * 1.25 && self.mohamedButtonEnabled) {
         self.mohamedButtonHover = 1;
