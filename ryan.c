@@ -63,7 +63,7 @@ double randomDouble(double lowerBound, double upperBound) { // random double bet
 
 int main(int argc, char *argv[]) {
     /* set strategy */
-    self.strategy = ENGINE_STRATEGY_NAIVE_HEURISTIC;
+    self.strategy = ENGINE_STRATEGY_HEURISTIC;
     /* go */
     if (argc != 3) {
         ERROR_PRINT("Expected 3 arguments, got %d\n", argc);
@@ -260,8 +260,39 @@ int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *mo
 
 int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves) {
     int32_t lookAhead = 2; // cycles to look ahead (1 cycle is a move from each player)
-
-    return 0;
+    for (int32_t cycle = 0; cycle < lookAhead; cycle++) {
+        
+    }
+    /* determine opponent's best move */
+    list_t *opponentPoints = list_init();
+    int32_t minPoints = 100000;
+    for (int32_t move = 0; move < moves -> length; move++) {
+        list_t *possibleOpponentMoves = generateAllMoves(moves -> data[move].s + 1, !turn);
+        int32_t maxPoints = -1000000;
+        for (int32_t opponentMove = 0; opponentMove < possibleOpponentMoves -> length; opponentMove += MOVES_NUMBER_OF_FIELDS) {
+            int32_t value = heuristic(possibleOpponentMoves -> data[opponentMove + MOVES_STRING].s + 1, !turn);
+            if (value > maxPoints) {
+                maxPoints = value;
+            }
+        }
+        list_free(possibleOpponentMoves);
+        list_append(opponentPoints, (unitype) maxPoints, 'i');
+        if (opponentPoints -> data[move].i < minPoints) {
+            minPoints = opponentPoints -> data[move].i;
+        }
+    }
+    /* determine all moves that result in opponent minPoints */
+    list_t *moveIndex = list_init();
+    for (int32_t move = 0; move < opponentPoints -> length; move++) {
+        if (opponentPoints -> data[move].i == minPoints) {
+            list_append(moveIndex, (unitype) move, 'i');
+        }
+    }
+    list_free(opponentPoints);
+    int32_t randomIndex = randomInt(0, moveIndex -> length - 1);
+    int32_t pick = moveIndex -> data[randomIndex].i;
+    list_free(moveIndex);
+    return pick;
 }
 
 int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves) {
