@@ -6,8 +6,9 @@ Strategies:
 - Minimise opponent moves
 - Heuristic
 
-From extensive testing (2 games), it seems like pointHeuristic beats positionHeuristic (on black and white)
-pointHeuristic also beat hybridHeuristic twice (on black and white)
+Find a better way to play engines against each other for testing
+Check for mate (offense and defense) (protect against scholar's mate)
+Some way to avoid stalemates when you have them dead to rights
 */
 
 #define UNITYPE_LIST_IMPLEMENTATION

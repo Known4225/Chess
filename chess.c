@@ -31,6 +31,7 @@ TODO:
   - Engine pictures
   - Support for more than two engines
   - Chat logs?
+- Space to make engine move
 */
 
 #include "chess.h"
