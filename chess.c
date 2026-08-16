@@ -28,6 +28,7 @@ TODO:
 - Graphical updates
   - Engine pictures
   - Support for more than two engines
+  - Chat logs?
 */
 
 #include "chess.h"
@@ -130,6 +131,7 @@ typedef struct {
     tt_switch_t *mohamedColorLock[2];
     tt_switch_t *ryanColorLock[2];
     int8_t speech;
+    int32_t speechAnimation;
     char speechContent[4096];
 } chess_t;
 
@@ -251,6 +253,7 @@ void init() {
     self.mohamedColorLock[0] -> value = 1; // start as white
     self.ryanColorLock[1] -> value = 1; // start as black
     self.speech = 0;
+    self.speechAnimation = 0;
 }
 
 void setColor(int32_t color) {
@@ -279,7 +282,7 @@ void turtleRoundedRectangle(double x1, double y1, double x2, double y2, double r
     turtleRectangle(x1 + radius, y1 + radius, x2 - radius, y2 - radius);
 }
 
-void speechBubble(char *text, double x, double y, double size, double originX, double originY, int8_t color, int8_t position) {
+void speechBubble(char *text, double x, double y, double size, double originX, double originY, int8_t color, int8_t position, double opacity) {
     char textCopy[4096];
     strcpy(textCopy, text);
     /* calculate width and height */
@@ -302,6 +305,7 @@ void speechBubble(char *text, double x, double y, double size, double originX, d
         tt_setColor(TT_COLOR_BLACK);
         // turtlePenColor(92, 89, 87);
     }
+    turtle.pena = opacity;
     double leading = size * 1.3;
     double centerX = x;
     double centerY = y;
@@ -368,6 +372,7 @@ void speechBubble(char *text, double x, double y, double size, double originX, d
         tt_setColor(TT_COLOR_WHITE);
         // turtlePenColor(249, 249, 249);
     }
+    turtle.pena = opacity;
     int32_t index = 0;
     for (int32_t i = 0; i < lines; i++) {
         turtleTextWriteUnicode(textCopy + index, centerX, ypos, size, 50);
@@ -399,6 +404,7 @@ void newGame() {
     self.movesTotal = 0;
     self.movesSinceCapture = 0;
     self.speech = 0;
+    self.speechAnimation = 0;
 }
 
 /* import a file to board - TODO */
@@ -649,13 +655,13 @@ void render() {
             if (self.turn == CHESS_BLACK) {
                 turtleTexture(self.pieces[11], self.boardX - 12 + offsetX, self.boardY - 40, self.boardX + 8 + offsetX, self.boardY, 90);
                 turtleTexture(self.pieces[5], self.boardX + 20 + offsetX, self.boardY - 24, self.boardX - 20 + offsetX, self.boardY + 16, 0);
-                speechBubble(":(", self.boardX - 27 + offsetX, self.boardY - 8, 8, self.boardX - 20 + offsetX, self.boardY - 18, CHESS_BLACK, SPEECH_BUBBLE_CENTER);
-                speechBubble("!", self.boardX + 15 + offsetX, self.boardY + 21, 8, self.boardX + 10 + offsetX, self.boardY + 9, CHESS_WHITE, SPEECH_BUBBLE_CENTER);
+                speechBubble(":(", self.boardX - 27 + offsetX, self.boardY - 8, 8, self.boardX - 20 + offsetX, self.boardY - 18, CHESS_BLACK, SPEECH_BUBBLE_CENTER, 1.0);
+                speechBubble("!", self.boardX + 15 + offsetX, self.boardY + 21, 8, self.boardX + 10 + offsetX, self.boardY + 9, CHESS_WHITE, SPEECH_BUBBLE_CENTER, 1.0);
             } else {
                 turtleTexture(self.pieces[5], self.boardX - 8 + offsetX, self.boardY - 40, self.boardX + 12 + offsetX, self.boardY, -90);
                 turtleTexture(self.pieces[11], self.boardX + 20 + offsetX, self.boardY - 24, self.boardX - 20 + offsetX, self.boardY + 16, 0);
-                speechBubble(":(", self.boardX + 27 + offsetX, self.boardY - 8, 8, self.boardX + 20 + offsetX, self.boardY - 18, CHESS_WHITE, SPEECH_BUBBLE_CENTER);
-                speechBubble("!", self.boardX - 15 + offsetX, self.boardY + 21, 8, self.boardX - 10 + offsetX, self.boardY + 9, CHESS_BLACK, SPEECH_BUBBLE_CENTER);
+                speechBubble(":(", self.boardX + 27 + offsetX, self.boardY - 8, 8, self.boardX + 20 + offsetX, self.boardY - 18, CHESS_WHITE, SPEECH_BUBBLE_CENTER, 1.0);
+                speechBubble("!", self.boardX - 15 + offsetX, self.boardY + 21, 8, self.boardX - 10 + offsetX, self.boardY + 9, CHESS_BLACK, SPEECH_BUBBLE_CENTER, 1.0);
             }
         } else if (self.state == BOARD_STATE_STALEMATE) {
             setColor(CHESS_COLOR_BLACK_SQUARE);
@@ -668,8 +674,8 @@ void render() {
             turtleTextWriteString("Stalemate", self.boardX + offsetX, self.boardY + 50, 12, 50);
             turtleTexture(self.pieces[11], self.boardX - 45 + offsetX, self.boardY - 30, self.boardX - 5 + offsetX, self.boardY + 10, 0);
             turtleTexture(self.pieces[5], self.boardX + 45 + offsetX, self.boardY - 30, self.boardX + 5 + offsetX, self.boardY + 10, 0);
-            speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK, SPEECH_BUBBLE_CENTER);
-            speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE, SPEECH_BUBBLE_CENTER);
+            speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK, SPEECH_BUBBLE_CENTER, 1.0);
+            speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE, SPEECH_BUBBLE_CENTER, 1.0);
         }
     } else {
         self.newGame -> enabled = TT_ELEMENT_HIDE;
@@ -754,10 +760,19 @@ void render() {
     turtleTextureColor(self.ryanImage, ryanX, buttonY, ryanX + buttonWidth, buttonY + buttonWidth * 1.25, 0, greyOut, greyOut, greyOut); // TODO - find a way to grey out button
     tt_setColor(TT_COLOR_TEXT);
     turtleTextWriteString("Ryan", ryanX + buttonWidth / 2, buttonY - 6, 6, 50);
-    if (self.speech == 1) {
-        speechBubble(self.speechContent, mohamedX + buttonWidth / 2 + 10, buttonY + buttonWidth * 1.25 - 40, 6, mohamedX + buttonWidth / 2 + 5, buttonY + buttonWidth * 1.25 - 50, !self.turn, SPEECH_BUBBLE_BOTTOM_LEFT);
-    } else if (self.speech == 2) {
-        speechBubble(self.speechContent, ryanX + buttonWidth / 2 - 10, buttonY + buttonWidth * 1.25 - 40, 6, ryanX + buttonWidth / 2 - 5, buttonY + buttonWidth * 1.25 - 50, !self.turn, SPEECH_BUBBLE_BOTTOM_RIGHT);
+    double opacity = 1.0;
+    if (self.speechAnimation < 120) {
+        opacity = self.speechAnimation / 120.0;
+    }
+    if (self.speechAnimation > 0) {
+        if (self.speech == 1) {
+            speechBubble(self.speechContent, mohamedX + buttonWidth / 2 + 10, buttonY + buttonWidth * 1.25 - 40, 6, mohamedX + buttonWidth / 2 + 5, buttonY + buttonWidth * 1.25 - 50, !self.turn, SPEECH_BUBBLE_BOTTOM_LEFT, opacity);
+        } else if (self.speech == 2) {
+            speechBubble(self.speechContent, ryanX + buttonWidth / 2 - 10, buttonY + buttonWidth * 1.25 - 40, 6, ryanX + buttonWidth / 2 - 5, buttonY + buttonWidth * 1.25 - 50, !self.turn, SPEECH_BUBBLE_BOTTOM_RIGHT, opacity);
+        }
+    }
+    if (self.speechAnimation > 0) {
+        self.speechAnimation--;
     }
 }
 
@@ -871,6 +886,7 @@ void mouse() {
                     sprintf(self.speechContent, "ERROR: returned %d\n", status);
                 }
                 self.speech = 1;
+                self.speechAnimation = 1200;
             }
             if (self.ryanButtonHover) {
                 int32_t status = engineMove("ryan.exe");
@@ -878,7 +894,7 @@ void mouse() {
                     sprintf(self.speechContent, "ERROR: returned %d\n", status);
                 }
                 self.speech = 2;
-
+                self.speechAnimation = 1200;
             }
             /* check for manual pawn promotion */
             if ((self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) && self.pawnPromotionIndex != -1) {
