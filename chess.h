@@ -804,12 +804,10 @@ int32_t checkBoardState(char *board, int8_t turn, int32_t movesSinceCapture) {
     list_free(moves);
     if (stalemate && check) {
         return BOARD_STATE_CHECKMATE;
-    } else if (stalemate) {
+    } else if (stalemate || movesSinceCapture >= 50) {
         return BOARD_STATE_STALEMATE;
     } else if (check) {
         return BOARD_STATE_CHECK;
-    } else if (movesSinceCapture >= 50) {
-        return BOARD_STATE_STALEMATE;
     }
     return BOARD_STATE_NONE;
 }

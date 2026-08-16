@@ -26,8 +26,8 @@ TODO:
 - Implement special stalemate conditions:
   - Threefold repetition
 - Graphical updates
-  - Cooler buttons
   - Speech bubbles
+  - Color lock engine options
 */
 
 #include "chess.h"
@@ -59,6 +59,14 @@ enum {
 enum {
     KEYS_LMB = 0,
     KEYS_SPACE = 1,
+};
+
+enum {
+    SPEECH_BUBBLE_CENTER = 0,
+    SPEECH_BUBBLE_BOTTOM_LEFT = 1,
+    SPEECH_BUBBLE_BOTTOM_RIGHT = 2,
+    SPEECH_BUBBLE_TOP_LEFT = 3,
+    SPEECH_BUBBLE_TOP_RIGHT = 4,
 };
 
 uint8_t colors[] = {
@@ -119,6 +127,8 @@ typedef struct {
     int8_t ryanButtonHover;
     turtle_texture_t mohamedImage;
     turtle_texture_t ryanImage;
+    int8_t speech;
+    char speechContent[4096];
 } chess_t;
 
 chess_t self;
@@ -228,6 +238,7 @@ void init() {
     strcat(constructedFilepath, "images/anonymous.jpg");
     self.ryanImage = turtleTextureLoad(constructedFilepath);
     free(constructedFilepath);
+    self.speech = 0;
 }
 
 void setColor(int32_t color) {
@@ -256,8 +267,8 @@ void turtleRoundedRectangle(double x1, double y1, double x2, double y2, double r
     turtleRectangle(x1 + radius, y1 + radius, x2 - radius, y2 - radius);
 }
 
-void speechBubble(char *text, double x, double y, double size, double originX, double originY, int8_t color) {
-    char textCopy[1024];
+void speechBubble(char *text, double x, double y, double size, double originX, double originY, int8_t color, int8_t position) {
+    char textCopy[4096];
     strcpy(textCopy, text);
     /* calculate width and height */
     double maxLength = 0;
@@ -280,12 +291,63 @@ void speechBubble(char *text, double x, double y, double size, double originX, d
         // turtlePenColor(92, 89, 87);
     }
     double leading = size * 1.3;
-    double ypos = y + (lines - 1) / 2.0 * leading;
-    turtleRoundedRectangle(x - maxLength / 2, ypos + leading / 1.3, x + maxLength / 2, y - (lines - 1) / 2.0 * leading - leading / 1.3, size / 1.5);
-    double firstPointX = (y - originY) / 4 + x;
-    double firstPointY = (originX - x) / 4 + y;
-    double thirdPointX = (originY - y) / 4 + x;
-    double thirdPointY = (x - originX) / 4 + y;
+    double centerX = x;
+    double centerY = y;
+    switch (position) {
+        case SPEECH_BUBBLE_BOTTOM_LEFT:
+            centerX += maxLength / 2;
+            centerY += (lines - 1) / 2.0 * leading;
+        break;
+        case SPEECH_BUBBLE_BOTTOM_RIGHT:
+            centerX -= maxLength / 2;
+            centerY += (lines - 1) / 2.0 * leading;
+        break;
+        case SPEECH_BUBBLE_TOP_LEFT:
+            centerX += maxLength / 2;
+            centerY -= (lines - 1) / 2.0 * leading;
+        break;
+        case SPEECH_BUBBLE_TOP_RIGHT:
+            centerX -= maxLength / 2;
+            centerY -= (lines - 1) / 2.0 * leading;
+        break;
+        default:
+        break;
+    }
+    double ypos = centerY + (lines - 1) / 2.0 * leading;
+    double x1 = centerX - maxLength / 2;
+    double y1 = ypos + leading / 1.3;
+    double x2 = centerX + maxLength / 2;
+    double y2 = centerY - (lines - 1) / 2.0 * leading - leading / 1.3;
+    turtleRoundedRectangle(x1, y1, x2, y2, size / 1.5);
+    double firstPointX = (centerY - originY) / 4 + centerX;
+    double firstPointY = (originX - centerX) / 4 + centerY;
+    double thirdPointX = (originY - centerY) / 4 + centerX;
+    double thirdPointY = (centerX - originX) / 4 + centerY;
+    /* clamp points */
+    if (firstPointX < x1) {
+        firstPointX = x1;
+    }
+    if (firstPointX > x2) {
+        firstPointX = x2;
+    }
+    if (firstPointY > y1) {
+        firstPointY = y1;
+    }
+    if (firstPointY < y2) {
+        firstPointY = y2;
+    }
+    if (thirdPointX < x1) {
+        thirdPointX = x1;
+    }
+    if (thirdPointX > x2) {
+        thirdPointX = x2;
+    }
+    if (thirdPointY > y1) {
+        thirdPointY = y1;
+    }
+    if (thirdPointY < y2) {
+        thirdPointY = y2;
+    }
     turtleTriangle(firstPointX, firstPointY, originX, originY, thirdPointX, thirdPointY);
     if (color == CHESS_WHITE) {
         tt_setColor(TT_COLOR_BLACK);
@@ -296,7 +358,7 @@ void speechBubble(char *text, double x, double y, double size, double originX, d
     }
     int32_t index = 0;
     for (int32_t i = 0; i < lines; i++) {
-        turtleTextWriteUnicode(textCopy + index, x, ypos, size, 50);
+        turtleTextWriteUnicode(textCopy + index, centerX, ypos, size, 50);
         index += strlen(textCopy + index) + 1;
         ypos -= leading;
     }
@@ -324,6 +386,7 @@ void newGame() {
     self.state = BOARD_STATE_NONE;
     self.movesTotal = 0;
     self.movesSinceCapture = 0;
+    self.speech = 0;
 }
 
 /* import a file to board - TODO */
@@ -566,13 +629,13 @@ void render() {
             if (self.turn == CHESS_BLACK) {
                 turtleTexture(self.pieces[11], self.boardX - 12 + offsetX, self.boardY - 40, self.boardX + 8 + offsetX, self.boardY, 90);
                 turtleTexture(self.pieces[5], self.boardX + 20 + offsetX, self.boardY - 24, self.boardX - 20 + offsetX, self.boardY + 16, 0);
-                speechBubble(":(", self.boardX - 27 + offsetX, self.boardY - 8, 8, self.boardX - 20 + offsetX, self.boardY - 18, CHESS_BLACK);
-                speechBubble("!", self.boardX + 15 + offsetX, self.boardY + 21, 8, self.boardX + 10 + offsetX, self.boardY + 9, CHESS_WHITE);
+                speechBubble(":(", self.boardX - 27 + offsetX, self.boardY - 8, 8, self.boardX - 20 + offsetX, self.boardY - 18, CHESS_BLACK, SPEECH_BUBBLE_CENTER);
+                speechBubble("!", self.boardX + 15 + offsetX, self.boardY + 21, 8, self.boardX + 10 + offsetX, self.boardY + 9, CHESS_WHITE, SPEECH_BUBBLE_CENTER);
             } else {
                 turtleTexture(self.pieces[5], self.boardX - 8 + offsetX, self.boardY - 40, self.boardX + 12 + offsetX, self.boardY, -90);
                 turtleTexture(self.pieces[11], self.boardX + 20 + offsetX, self.boardY - 24, self.boardX - 20 + offsetX, self.boardY + 16, 0);
-                speechBubble(":(", self.boardX + 27 + offsetX, self.boardY - 8, 8, self.boardX + 20 + offsetX, self.boardY - 18, CHESS_WHITE);
-                speechBubble("!", self.boardX - 15 + offsetX, self.boardY + 21, 8, self.boardX - 10 + offsetX, self.boardY + 9, CHESS_BLACK);
+                speechBubble(":(", self.boardX + 27 + offsetX, self.boardY - 8, 8, self.boardX + 20 + offsetX, self.boardY - 18, CHESS_WHITE, SPEECH_BUBBLE_CENTER);
+                speechBubble("!", self.boardX - 15 + offsetX, self.boardY + 21, 8, self.boardX - 10 + offsetX, self.boardY + 9, CHESS_BLACK, SPEECH_BUBBLE_CENTER);
             }
         } else if (self.state == BOARD_STATE_STALEMATE) {
             setColor(CHESS_COLOR_BLACK_SQUARE);
@@ -585,8 +648,8 @@ void render() {
             turtleTextWriteString("Stalemate", self.boardX + offsetX, self.boardY + 50, 12, 50);
             turtleTexture(self.pieces[11], self.boardX - 45 + offsetX, self.boardY - 30, self.boardX - 5 + offsetX, self.boardY + 10, 0);
             turtleTexture(self.pieces[5], self.boardX + 45 + offsetX, self.boardY - 30, self.boardX + 5 + offsetX, self.boardY + 10, 0);
-            speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK);
-            speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE);
+            speechBubble("?", self.boardX - 35 + offsetX, self.boardY + 20, 8, self.boardX - 30 + offsetX, self.boardY + 8, CHESS_BLACK, SPEECH_BUBBLE_CENTER);
+            speechBubble("?", self.boardX + 35 + offsetX, self.boardY + 20, 8, self.boardX + 30 + offsetX, self.boardY + 8, CHESS_WHITE, SPEECH_BUBBLE_CENTER);
         }
     } else {
         self.newGame -> enabled = TT_ELEMENT_HIDE;
@@ -659,6 +722,11 @@ void render() {
     turtleTextureColor(self.ryanImage, ryanX, buttonY, ryanX + buttonWidth, buttonY + buttonWidth * 1.25, 0, greyOut, greyOut, greyOut); // TODO - find a way to grey out button
     tt_setColor(TT_COLOR_TEXT);
     turtleTextWriteString("Ryan", ryanX + buttonWidth / 2, buttonY - 6, 6, 50);
+    if (self.speech == 1) {
+        speechBubble(self.speechContent, mohamedX + buttonWidth / 2 + 10, buttonY + buttonWidth * 1.25 - 40, 6, mohamedX + buttonWidth / 2 + 5, buttonY + buttonWidth * 1.25 - 50, !self.turn, SPEECH_BUBBLE_BOTTOM_LEFT);
+    } else if (self.speech == 2) {
+        speechBubble(self.speechContent, ryanX + buttonWidth / 2 - 10, buttonY + buttonWidth * 1.25 - 40, 6, ryanX + buttonWidth / 2 - 5, buttonY + buttonWidth * 1.25 - 50, !self.turn, SPEECH_BUBBLE_BOTTOM_RIGHT);
+    }
 }
 
 int32_t engineMove(char *engineName) {
@@ -707,7 +775,6 @@ int32_t engineMove(char *engineName) {
     }
     char line[1024];
     fgets(line, 1024, outputfp);
-    fclose(outputfp);
     for (int32_t i = 0; i < 2; i++) {
         if (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r') {
             line[strlen(line) - 1] = '\0';
@@ -748,6 +815,12 @@ int32_t engineMove(char *engineName) {
     list_free(moves);
     self.state = checkBoardState(self.board, self.turn, self.movesSinceCapture);
     MUTEX_RELEASE(self.boardMutex);
+    /* update speechContent */
+    self.speechContent[0] = '\0';
+    while (fgets(line, 1024, outputfp) != NULL) {
+        strcat(self.speechContent, line);
+    }
+    fclose(outputfp);    
     return 0;
 }
 
@@ -763,14 +836,17 @@ void mouse() {
             if (self.mohamedButtonHover) {
                 int32_t status = engineMove("mohamed.exe");
                 if (status != 0) {
-
+                    sprintf(self.speechContent, "ERROR: returned %d\n", status);
                 }
+                self.speech = 1;
             }
             if (self.ryanButtonHover) {
                 int32_t status = engineMove("ryan.exe");
                 if (status != 0) {
-
+                    sprintf(self.speechContent, "ERROR: returned %d\n", status);
                 }
+                self.speech = 2;
+
             }
             /* check for manual pawn promotion */
             if ((self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) && self.pawnPromotionIndex != -1) {
@@ -795,6 +871,7 @@ void mouse() {
             MUTEX_ACQUIRE(self.boardMutex);
             if (self.mousePiece != -1 && list_find(self.valid, (unitype) self.mousePiece, 'c') >= 0) {
                 /* make move */
+                self.speech = 0;
                 self.movesTotal++;
                 self.movesSinceCapture++;
                 if (self.board[self.mousePiece] != BLANK_SPACE) {
@@ -843,6 +920,7 @@ void mouse() {
             MUTEX_ACQUIRE(self.validMutex);
             if (self.mousePiece == self.highlightedSquare[0] && list_find(self.valid, (unitype) self.mouseSquare, 'c') >= 0) {
                 /* make move */
+                self.speech = 0;
                 self.movesTotal++;
                 self.movesSinceCapture++;
                 if (self.board[self.mouseSquare] != BLANK_SPACE) {

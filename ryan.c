@@ -18,6 +18,18 @@ typedef enum {
     ENGINE_STRATEGY_MAXIMISE_MOVES = 3,
 } engine_strategy_t;
 
+char dialog[][128] = {
+    "Hey it's nice to meet you",
+    "This world is imperfect.",
+    "What",
+    "If only I could wipe away\nthe impurities,",
+    "Is anybody else listening\nto this",
+    "and make it as beautiful\nas me!",
+    "14 hours of gameplay later",
+    "Lysanderoth! You were behind\nall this?",
+    "Yes it was I. My machinations lay\nundetected for years for\nI am a master of deception",
+};
+
 /* returns an index of moves, returns -1 if error */
 int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves);
 int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves);
@@ -81,7 +93,9 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     list_delete(self.moves, 0); // delete input board
-    srand(time(NULL));
+    struct timespec currentTime;
+    clock_gettime(CLOCK_REALTIME, &currentTime);
+    srand(currentTime.tv_nsec);
     int32_t status = 0;
     if (self.strategy == ENGINE_STRATEGY_RANDOM) {
         status = engineStrategyRandom(self.board, self.turn, self.moves);
@@ -104,7 +118,7 @@ int main(int argc, char *argv[]) {
     }
     fwrite(self.moves -> data[status].s, 1, 65, outputfp);
     fwrite("\n", 1, 1, outputfp);
-    fprintf(outputfp, "Hello World\n");
+    fprintf(outputfp, dialog[randomInt(0, sizeof(dialog) / 128 - 1)]);
     fclose(outputfp);
     return 0;
 }
