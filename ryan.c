@@ -242,12 +242,39 @@ double pointHeuristic(char *board, chess_color_t turn) {
     return blackPoints - whitePoints;
 }
 
+double maxDouble(double a, double b) {
+    if (a > b) {
+        return a;
+    }
+    return b;
+}
+
+double getMultiplier(char *board, int32_t square) {
+    double multiplier = (1.0 - maxDouble(fabs(square / 8 - 3.5), fabs(square % 8 - 3.5)) / 3.5) * 0.2 + 0.8; // ring distance from center of board (scaled from 0.8 to 1.0)
+    /* augment multiplier based on piece type */
+    chess_piece_t piece = getPieceType(board[square]);
+    switch (piece) {
+        case CHESS_PIECE_PAWN:
+        multiplier *= 1;
+        break;
+        case CHESS_PIECE_QUEEN:
+        multiplier = 1; // queen in center is not necessarily good
+        break;
+        case CHESS_PIECE_KING:
+        multiplier = (1.0 - (multiplier - 0.8)); // reverse king's incentive (go to the edge)
+        break;
+        default:
+        multiplier = multiplier; // remain unchanged
+    }
+    return multiplier;
+}
+
 /* point + position-based heuristic */
 double positionHeuristic(char *board, chess_color_t turn) {
     double whitePosition = 0;
     double blackPosition = 0;
     for (int32_t square = 0; square < 64; square++) {
-        double multiplier = ((24.5 - ((square / 8 - 3.5) * (square / 8 - 3.5) + (square % 8 - 3.5) * (square % 8 - 3.5))) / 24.5) * 0.2 + 0.8; // euclidean distance from center of board (scaled from 0.8 to 1.0)
+        double multiplier = getMultiplier(board, square);
         int32_t points = getPiecePoints(board[square]);
         if (getPieceColor(board[square]) == CHESS_WHITE) {
             whitePosition += points * multiplier;
@@ -270,7 +297,7 @@ double hybridHeuristic(char *board, chess_color_t turn) {
     double blackPosition = 0;
     double totalPoints = 0;
     for (int32_t square = 0; square < 64; square++) {
-        double multiplier = ((24.5 - ((square / 8 - 3.5) * (square / 8 - 3.5) + (square % 8 - 3.5) * (square % 8 - 3.5))) / 24.5) * 0.2 + 0.8; // euclidean distance from center of board (scaled from 0.8 to 1.0)
+        double multiplier = getMultiplier(board, square);
         double points = getPiecePoints(board[square]);
         if (getPieceColor(board[square]) == CHESS_WHITE) {
             whitePoints += points;
@@ -328,32 +355,33 @@ int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves, 
         
     }
     /* determine opponent's best move */
-    list_t *opponentPoints = list_init();
-    double minPoints = 100000;
+    list_t *points = list_init();
+    double maxPoints = -1000000;
     for (int32_t move = 0; move < moves -> length; move++) {
         list_t *possibleOpponentMoves = generateAllMoves(moves -> data[move].s + 1, !turn);
-        double maxPoints = -1000000;
+        double maxOpponentPoints = -1000000;
         for (int32_t opponentMove = 0; opponentMove < possibleOpponentMoves -> length; opponentMove += MOVES_NUMBER_OF_FIELDS) {
             double value = heuristic(possibleOpponentMoves -> data[opponentMove + MOVES_STRING].s + 1, !turn);
-            if (value > maxPoints) {
-                maxPoints = value;
+            if (value > maxOpponentPoints) {
+                maxOpponentPoints = value;
             }
         }
         list_free(possibleOpponentMoves);
-        list_append(opponentPoints, (unitype) maxPoints, 'd');
-        if (opponentPoints -> data[move].d < minPoints) {
-            minPoints = opponentPoints -> data[move].d;
+        double myPoints = heuristic(moves -> data[move].s + 1, turn); // my points for this move
+        double totalPoints = -maxOpponentPoints + 0; // don't use my points until we can come up with a way to make him stop salivating over short term success (takes queen for rook trades because he's excited about the dopamine rush)
+        list_append(points, (unitype) totalPoints, 'd');
+        if (totalPoints > maxPoints) {
+            maxPoints = totalPoints;
         }
     }
-    /* determine all moves that result in opponent minPoints */
+    /* determine all moves that result in maxPoints */
     list_t *moveIndex = list_init();
-    for (int32_t move = 0; move < opponentPoints -> length; move++) {
-        if (opponentPoints -> data[move].d == minPoints) {
+    for (int32_t move = 0; move < points -> length; move++) {
+        if (fabs(points -> data[move].d - maxPoints) < 0.01) {
             list_append(moveIndex, (unitype) move, 'i');
         }
     }
-    list_print(opponentPoints);
-    list_free(opponentPoints);
+    list_free(points);
     int32_t randomIndex = randomInt(0, moveIndex -> length - 1);
     int32_t pick = moveIndex -> data[randomIndex].i;
     list_free(moveIndex);
