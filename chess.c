@@ -26,7 +26,6 @@ TODO:
 - Implement special stalemate conditions:
   - Threefold repetition
 - Graphical updates
-  - Speech bubbles
   - Color lock engine options
 */
 
