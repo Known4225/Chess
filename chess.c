@@ -113,8 +113,10 @@ typedef struct {
     /* engines */
     char inputFilename[4096];
     char outputFilename[4096];
-    tt_button_t *mohamedButton;
-    tt_button_t *ryanButton;
+    int8_t mohamedButtonEnabled;
+    int8_t ryanButtonEnabled;
+    int8_t mohamedButtonHover;
+    int8_t ryanButtonHover;
     turtle_texture_t mohamedImage;
     turtle_texture_t ryanImage;
 } chess_t;
@@ -214,10 +216,10 @@ void init() {
     strcpy(self.outputFilename, osToolsFileDialog.executableFilepath);
     strcat(self.outputFilename, "output.txt");
 
-    self.mohamedButton = tt_buttonInit("Mohamed", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 9, 10);
-    self.mohamedButton -> align = TT_BUTTON_ALIGN_LEFT;
-    self.ryanButton = tt_buttonInit("Ryan", NULL, self.boardX + self.boardSize + 10, self.boardY + self.boardSize - 36, 10);
-    self.ryanButton -> align = TT_BUTTON_ALIGN_LEFT;
+    // self.mohamedButton = tt_buttonInit("Mohamed", NULL, self.boardX + self.boardSize + 30, self.boardY - 30, 10);
+    // self.mohamedButton -> align = TT_BUTTON_ALIGN_LEFT;
+    // self.ryanButton = tt_buttonInit("Ryan", NULL, self.boardX + self.boardSize + 100, self.boardY - 30, 10);
+    // self.ryanButton -> align = TT_BUTTON_ALIGN_LEFT;
 
     strcpy(constructedFilepath, osToolsFileDialog.executableFilepath);
     strcat(constructedFilepath, "images/anonymous.jpg");
@@ -481,14 +483,25 @@ void render() {
     /* render sidebar */
     setColor(CHESS_COLOR_BLACK_SQUARE);
     turtleRoundedRectangle(self.boardX - self.boardSize - 30, self.boardY + self.boardSize, self.boardX - self.boardSize - 110, self.boardY + self.boardSize - 20, 5);
-    if (self.turn == CHESS_WHITE) {
-        turtlePenColor(249, 249, 249);
-        tt_setColor(TT_COLOR_WHITE);
-        turtleTextWriteString("Turn: White", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
+    if (self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
+        if (self.turn == CHESS_WHITE) {
+            turtlePenColor(92, 89, 87);
+            tt_setColor(TT_COLOR_BLACK);
+        } else {
+            turtlePenColor(249, 249, 249);
+            tt_setColor(TT_COLOR_WHITE);
+        }
+        turtleTextWriteString("Game Over", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
     } else {
-        turtlePenColor(92, 89, 87);
-        tt_setColor(TT_COLOR_BLACK);
-        turtleTextWriteString("Turn: Black", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
+        if (self.turn == CHESS_WHITE) {
+            turtlePenColor(249, 249, 249);
+            tt_setColor(TT_COLOR_WHITE);
+            turtleTextWriteString("Turn: White", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
+        } else {
+            turtlePenColor(92, 89, 87);
+            tt_setColor(TT_COLOR_BLACK);
+            turtleTextWriteString("Turn: Black", self.boardX - self.boardSize - 70, self.boardY + self.boardSize - 10, 10, 50);
+        }
     }
     /* render pawn promotion */
     if (self.pawnPromotionWhite != -1) {
@@ -527,15 +540,15 @@ void render() {
         }
     }
     if (self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) {
-        self.mohamedButton -> enabled = TT_ELEMENT_NO_MOUSE;
-        self.ryanButton -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.mohamedButtonEnabled = 0;
+        self.ryanButtonEnabled = 0;
     } else {
-        self.mohamedButton -> enabled = TT_ELEMENT_ENABLED;
-        self.ryanButton -> enabled = TT_ELEMENT_ENABLED;
+        self.mohamedButtonEnabled = 1;
+        self.ryanButtonEnabled = 1;
     }
     if (self.state == BOARD_STATE_CHECKMATE || self.state == BOARD_STATE_STALEMATE) {
-        self.mohamedButton -> enabled = TT_ELEMENT_NO_MOUSE;
-        self.ryanButton -> enabled = TT_ELEMENT_NO_MOUSE;
+        self.mohamedButtonEnabled = 0;
+        self.ryanButtonEnabled = 0;
         self.newGame -> enabled = TT_ELEMENT_ENABLED;
         if (self.state == BOARD_STATE_CHECKMATE) {
             setColor(CHESS_COLOR_BLACK_SQUARE);
@@ -607,20 +620,45 @@ void render() {
     }
 
     /* engine buttons */
-    if (self.mohamedButton -> value) {
-        self.mohamedButton -> value = 0;
-        int32_t status = engineMove("mohamed.exe");
-        if (status != 0) {
-
-        }
+    double buttonWidth = 72;
+    double buttonY = self.boardY + 30;
+    double mohamedX = self.boardX + self.boardSize + 10;
+    double ryanX = mohamedX + 87;
+    uint8_t greyOut = 255;
+    if (turtle.mouseX > mohamedX && turtle.mouseX < mohamedX + buttonWidth && turtle.mouseY > buttonY - 12 && turtle.mouseY < buttonY + buttonWidth * 1.25 && self.mohamedButtonEnabled) {
+        self.mohamedButtonHover = 1;
+    } else {
+        self.mohamedButtonHover = 0;
     }
-    if (self.ryanButton -> value) {
-        self.ryanButton -> value = 0;
-        int32_t status = engineMove("ryan.exe");
-        if (status != 0) {
-
-        }
+    if (turtle.mouseX > ryanX && turtle.mouseX < ryanX + buttonWidth && turtle.mouseY > buttonY - 12 && turtle.mouseY < buttonY + buttonWidth * 1.25 && self.ryanButtonEnabled) {
+        self.ryanButtonHover = 1;
+    } else {
+        self.ryanButtonHover = 0;
     }
+    tt_setColor(TT_COLOR_COMPONENT);
+    if (self.mohamedButtonEnabled) {
+        if (self.mohamedButtonHover) {
+            tt_setColor(TT_COLOR_COMPONENT_HIGHLIGHT);
+        }
+    } else {
+        greyOut = 100;
+    }
+    turtleRoundedRectangle(mohamedX, buttonY - 12, mohamedX + buttonWidth, buttonY + 10, buttonWidth / 10);
+    turtleTextureColor(self.mohamedImage, mohamedX, buttonY, mohamedX + buttonWidth, buttonY + buttonWidth * 1.25, 0, greyOut, greyOut, greyOut); // TODO - find a way to grey out button
+    tt_setColor(TT_COLOR_TEXT);
+    turtleTextWriteString("Mohamed", mohamedX + buttonWidth / 2, buttonY - 6, 6, 50);
+    tt_setColor(TT_COLOR_COMPONENT);
+    if (self.ryanButtonEnabled) {
+        if (self.ryanButtonHover) {
+            tt_setColor(TT_COLOR_COMPONENT_HIGHLIGHT);
+        }
+    } else {
+        greyOut = 100;
+    }
+    turtleRoundedRectangle(ryanX, buttonY - 12, ryanX + buttonWidth, buttonY + 10, buttonWidth / 10);
+    turtleTextureColor(self.ryanImage, ryanX, buttonY, ryanX + buttonWidth, buttonY + buttonWidth * 1.25, 0, greyOut, greyOut, greyOut); // TODO - find a way to grey out button
+    tt_setColor(TT_COLOR_TEXT);
+    turtleTextWriteString("Ryan", ryanX + buttonWidth / 2, buttonY - 6, 6, 50);
 }
 
 int32_t engineMove(char *engineName) {
@@ -721,6 +759,20 @@ void mouse() {
         if (self.keys[KEYS_LMB] == 0) {
             /* first tick */
             self.keys[KEYS_LMB] = 1;
+            /* check for engine buttons */
+            if (self.mohamedButtonHover) {
+                int32_t status = engineMove("mohamed.exe");
+                if (status != 0) {
+
+                }
+            }
+            if (self.ryanButtonHover) {
+                int32_t status = engineMove("ryan.exe");
+                if (status != 0) {
+
+                }
+            }
+            /* check for manual pawn promotion */
             if ((self.pawnPromotionWhite != -1 || self.pawnPromotionBlack != -1) && self.pawnPromotionIndex != -1) {
                 MUTEX_ACQUIRE(self.boardMutex);
                 if (self.pawnPromotionWhite != -1) {
@@ -737,6 +789,7 @@ void mouse() {
                 MUTEX_RELEASE(self.boardMutex);
                 return;
             }
+            /* check for board movement */
             self.mousePiece = self.mouseSquare;
             MUTEX_ACQUIRE(self.validMutex);
             MUTEX_ACQUIRE(self.boardMutex);
