@@ -26,6 +26,7 @@ TODO:
 - Implement special stalemate conditions:
   - Threefold repetition
 - Graphical updates
+  - Switch board perspective option
   - Engine pictures
   - Support for more than two engines
   - Chat logs?

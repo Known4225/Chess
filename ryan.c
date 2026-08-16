@@ -5,6 +5,9 @@ Strategies:
 - Random move
 - Minimise opponent moves
 - Heuristic
+
+From extensive testing (2 games), it seems like pointHeuristic beats positionHeuristic (on black and white)
+pointHeuristic also beat hybridHeuristic twice (on black and white)
 */
 
 #define UNITYPE_LIST_IMPLEMENTATION
@@ -34,13 +37,18 @@ char dialog[][128] = {
     "Yes it was I. My machinations lay\nundetected for years for\nI am a master of deception",
 };
 
-/* returns an index of moves, returns -1 if error */
+/* heuristics */
+double pointHeuristic(char *board, chess_color_t turn);
+double positionHeuristic(char *board, chess_color_t turn);
+double hybridHeuristic(char *board, chess_color_t turn);
+
+/* engines - returns an index of moves, returns -1 if error */
 int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves);
 int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves);
 int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves);
-int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *moves);
-int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves);
-int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves);
+int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *moves, double (*heuristic)(char *, chess_color_t));
+int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves, double (*heuristic)(char *, chess_color_t));
+int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves, double (*heuristic)(char *, chess_color_t));
 
 typedef struct {
     /* strategy */
@@ -115,13 +123,13 @@ int main(int argc, char *argv[]) {
         status = engineStrategyRandom(self.board, self.turn, self.moves);
         break;
         case ENGINE_STRATEGY_NAIVE_HEURISTIC:
-        status = engineStrategyNaiveHeuristic(self.board, self.turn, self.moves);
+        status = engineStrategyNaiveHeuristic(self.board, self.turn, self.moves, hybridHeuristic);
         break;
         case ENGINE_STRATEGY_HEURISTIC:
-        status = engineStrategyHeuristic(self.board, self.turn, self.moves);
+        status = engineStrategyHeuristic(self.board, self.turn, self.moves, hybridHeuristic);
         break;
         case ENGINE_STRATEGY_HEURISTIC_HYBRID:
-        status = engineStrategyHeuristicHybrid(self.board, self.turn, self.moves);
+        status = engineStrategyHeuristicHybrid(self.board, self.turn, self.moves, hybridHeuristic);
         break;
         default:
         ERROR_PRINT("Unknown strategy %d\n", self.strategy);
@@ -216,9 +224,10 @@ int32_t getPiecePoints(char code) {
     }
 }
 
-int32_t heuristic(char *board, chess_color_t turn) {
-    int32_t whitePoints = 0;
-    int32_t blackPoints = 0;
+/* point-based heuristic */
+double pointHeuristic(char *board, chess_color_t turn) {
+    double whitePoints = 0;
+    double blackPoints = 0;
     for (int32_t square = 0; square < 64; square++) {
         int32_t points = getPiecePoints(board[square]);
         if (getPieceColor(board[square]) == CHESS_WHITE) {
@@ -233,21 +242,75 @@ int32_t heuristic(char *board, chess_color_t turn) {
     return blackPoints - whitePoints;
 }
 
-int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *moves) {
+/* point + position-based heuristic */
+double positionHeuristic(char *board, chess_color_t turn) {
+    double whitePosition = 0;
+    double blackPosition = 0;
+    for (int32_t square = 0; square < 64; square++) {
+        double multiplier = ((24.5 - ((square / 8 - 3.5) * (square / 8 - 3.5) + (square % 8 - 3.5) * (square % 8 - 3.5))) / 24.5) * 0.2 + 0.8; // euclidean distance from center of board (scaled from 0.8 to 1.0)
+        int32_t points = getPiecePoints(board[square]);
+        if (getPieceColor(board[square]) == CHESS_WHITE) {
+            whitePosition += points * multiplier;
+        } else {
+            blackPosition += points * multiplier;
+        }
+    }
+    if (turn == CHESS_WHITE) {
+        return whitePosition - blackPosition;
+    }
+    return blackPosition - whitePosition;
+}
+
+/* hybrid heuristic based on number of total points on the board */
+double hybridHeuristic(char *board, chess_color_t turn) {
+    double cutoffValue = 462;
+    double whitePoints = 0;
+    double blackPoints = 0;
+    double whitePosition = 0;
+    double blackPosition = 0;
+    double totalPoints = 0;
+    for (int32_t square = 0; square < 64; square++) {
+        double multiplier = ((24.5 - ((square / 8 - 3.5) * (square / 8 - 3.5) + (square % 8 - 3.5) * (square % 8 - 3.5))) / 24.5) * 0.2 + 0.8; // euclidean distance from center of board (scaled from 0.8 to 1.0)
+        double points = getPiecePoints(board[square]);
+        if (getPieceColor(board[square]) == CHESS_WHITE) {
+            whitePoints += points;
+            whitePosition += points * multiplier;
+        } else {
+            blackPoints += points;
+            blackPosition += points * multiplier;
+        }
+        totalPoints += points;
+    }
+    if (totalPoints >= cutoffValue) {
+        /* use point + position-based heuristic (early game) */
+        if (turn == CHESS_WHITE) {
+            return whitePosition - blackPosition;
+        }
+        return blackPosition - whitePosition;
+    }
+    /* use point-based heuristic (late game) */
+    if (turn == CHESS_WHITE) {
+        return whitePoints - blackPoints;
+    }
+    return blackPoints - whitePoints;
+}
+
+/* calculates best move based on highest point value for all possible moves */
+int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *moves, double (*heuristic)(char *, chess_color_t)) {
     /* single move heuristic */
     list_t *points = list_init();
-    int32_t maxPoints = -1000000;
+    double maxPoints = -1000000;
     for (int32_t move = 0; move < moves -> length; move++) {
-        int32_t value = heuristic(moves -> data[move].s + 1, turn);
+        double value = heuristic(moves -> data[move].s + 1, turn);
         if (value > maxPoints) {
             maxPoints = value;
         }
-        list_append(points, (unitype) value, 'i');
+        list_append(points, (unitype) value, 'd');
     }
     /* determine all moves that result in maxPoints */
     list_t *moveIndex = list_init();
     for (int32_t move = 0; move < points -> length; move++) {
-        if (points -> data[move].i == maxPoints) {
+        if (points -> data[move].d == maxPoints) {
             list_append(moveIndex, (unitype) move, 'i');
         }
     }
@@ -258,36 +321,38 @@ int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *mo
     return pick;
 }
 
-int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves) {
+/* calculates best move based on highest point value after two moves, assuming opponent makes a move according to engineStrategyNaiveHeuristic */
+int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves, double (*heuristic)(char *, chess_color_t)) {
     int32_t lookAhead = 2; // cycles to look ahead (1 cycle is a move from each player)
     for (int32_t cycle = 0; cycle < lookAhead; cycle++) {
         
     }
     /* determine opponent's best move */
     list_t *opponentPoints = list_init();
-    int32_t minPoints = 100000;
+    double minPoints = 100000;
     for (int32_t move = 0; move < moves -> length; move++) {
         list_t *possibleOpponentMoves = generateAllMoves(moves -> data[move].s + 1, !turn);
-        int32_t maxPoints = -1000000;
+        double maxPoints = -1000000;
         for (int32_t opponentMove = 0; opponentMove < possibleOpponentMoves -> length; opponentMove += MOVES_NUMBER_OF_FIELDS) {
-            int32_t value = heuristic(possibleOpponentMoves -> data[opponentMove + MOVES_STRING].s + 1, !turn);
+            double value = heuristic(possibleOpponentMoves -> data[opponentMove + MOVES_STRING].s + 1, !turn);
             if (value > maxPoints) {
                 maxPoints = value;
             }
         }
         list_free(possibleOpponentMoves);
-        list_append(opponentPoints, (unitype) maxPoints, 'i');
-        if (opponentPoints -> data[move].i < minPoints) {
-            minPoints = opponentPoints -> data[move].i;
+        list_append(opponentPoints, (unitype) maxPoints, 'd');
+        if (opponentPoints -> data[move].d < minPoints) {
+            minPoints = opponentPoints -> data[move].d;
         }
     }
     /* determine all moves that result in opponent minPoints */
     list_t *moveIndex = list_init();
     for (int32_t move = 0; move < opponentPoints -> length; move++) {
-        if (opponentPoints -> data[move].i == minPoints) {
+        if (opponentPoints -> data[move].d == minPoints) {
             list_append(moveIndex, (unitype) move, 'i');
         }
     }
+    list_print(opponentPoints);
     list_free(opponentPoints);
     int32_t randomIndex = randomInt(0, moveIndex -> length - 1);
     int32_t pick = moveIndex -> data[randomIndex].i;
@@ -295,6 +360,7 @@ int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves) 
     return pick;
 }
 
-int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves) {
+/* hybrid approach that also looks specifically for checkmate */
+int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves, double (*heuristic)(char *, chess_color_t)) {
     return 0;
 }
