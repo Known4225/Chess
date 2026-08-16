@@ -4,6 +4,7 @@ Created by Ryan Srichai 10.08.2026
 Strategies:
 - Random move
 - Minimise opponent moves
+- Heuristic
 */
 
 #define UNITYPE_LIST_IMPLEMENTATION
@@ -16,6 +17,9 @@ typedef enum {
     ENGINE_STRATEGY_RANDOM = 1,
     ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES = 2,
     ENGINE_STRATEGY_MAXIMISE_MOVES = 3,
+    ENGINE_STRATEGY_NAIVE_HEURISTIC = 4,
+    ENGINE_STRATEGY_HEURISTIC = 5,
+    ENGINE_STRATEGY_HEURISTIC_HYBRID = 6,
 } engine_strategy_t;
 
 char dialog[][128] = {
@@ -34,6 +38,9 @@ char dialog[][128] = {
 int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves);
 int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, list_t *moves);
 int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves);
+int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *moves);
+int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves);
+int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves);
 
 typedef struct {
     /* strategy */
@@ -56,7 +63,7 @@ double randomDouble(double lowerBound, double upperBound) { // random double bet
 
 int main(int argc, char *argv[]) {
     /* set strategy */
-    self.strategy = ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES;
+    self.strategy = ENGINE_STRATEGY_NAIVE_HEURISTIC;
     /* go */
     if (argc != 3) {
         ERROR_PRINT("Expected 3 arguments, got %d\n", argc);
@@ -97,13 +104,26 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_REALTIME, &currentTime);
     srand(currentTime.tv_nsec);
     int32_t status = 0;
-    if (self.strategy == ENGINE_STRATEGY_RANDOM) {
+    switch (self.strategy) {
+        case ENGINE_STRATEGY_RANDOM:
         status = engineStrategyRandom(self.board, self.turn, self.moves);
-    } else if (self.strategy == ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES) {
-        status = engineStrategyMinimiseOpponentMoves(self.board, self.turn, self.moves);
-    } else if (self.strategy == ENGINE_STRATEGY_MAXIMISE_MOVES) {
-        status = engineStrategyMaximiseMoves(self.board, self.turn, self.moves);
-    } else {
+        break;
+        case ENGINE_STRATEGY_MINIMISE_OPPONENT_MOVES:
+        status = engineStrategyRandom(self.board, self.turn, self.moves);
+        break;
+        case ENGINE_STRATEGY_MAXIMISE_MOVES:
+        status = engineStrategyRandom(self.board, self.turn, self.moves);
+        break;
+        case ENGINE_STRATEGY_NAIVE_HEURISTIC:
+        status = engineStrategyNaiveHeuristic(self.board, self.turn, self.moves);
+        break;
+        case ENGINE_STRATEGY_HEURISTIC:
+        status = engineStrategyHeuristic(self.board, self.turn, self.moves);
+        break;
+        case ENGINE_STRATEGY_HEURISTIC_HYBRID:
+        status = engineStrategyHeuristicHybrid(self.board, self.turn, self.moves);
+        break;
+        default:
         ERROR_PRINT("Unknown strategy %d\n", self.strategy);
         return -1;
     }
@@ -122,6 +142,16 @@ int main(int argc, char *argv[]) {
     fclose(outputfp);
     return 0;
 }
+
+/*
+███████╗████████╗██████╗  █████╗ ████████╗███████╗ ██████╗ ██╗███████╗███████╗
+██╔════╝╚══██╔══╝██╔══██╗██╔══██╗╚══██╔══╝██╔════╝██╔════╝ ██║██╔════╝██╔════╝
+███████╗   ██║   ██████╔╝███████║   ██║   █████╗  ██║  ███╗██║█████╗  ███████╗
+╚════██║   ██║   ██╔══██╗██╔══██║   ██║   ██╔══╝  ██║   ██║██║██╔══╝  ╚════██║
+███████║   ██║   ██║  ██║██║  ██║   ██║   ███████╗╚██████╔╝██║███████╗███████║
+╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝ ╚═╝╚══════╝╚══════╝
+https://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow
+*/
 
 int32_t engineStrategyRandom(char *board, chess_color_t turn, list_t *moves) {
     return randomInt(0, moves -> length - 1);
@@ -153,5 +183,87 @@ int32_t engineStrategyMinimiseOpponentMoves(char *board, chess_color_t turn, lis
 }
 
 int32_t engineStrategyMaximiseMoves(char *board, chess_color_t turn, list_t *moves) {
+    return 0;
+}
+
+int32_t getPiecePoints(char code) {
+    switch (code) {
+        case WHITE_PAWN:
+        case WHITE_PAWN_EN_PASSANT:
+        case BLACK_PAWN:
+        case BLACK_PAWN_EN_PASSANT:
+        return 1;
+        case WHITE_ROOK:
+        case WHITE_ROOK_NO_MOVE:
+        case BLACK_ROOK:
+        case BLACK_ROOK_NO_MOVE:
+        return 5;
+        case WHITE_KNIGHT:
+        case BLACK_KNIGHT:
+        case WHITE_BISHOP:
+        case BLACK_BISHOP:
+        return 3;
+        case WHITE_QUEEN:
+        case BLACK_QUEEN:
+        return 9;
+        case WHITE_KING:
+        case WHITE_KING_NO_MOVE:
+        case BLACK_KING:
+        case BLACK_KING_NO_MOVE:
+        return 200;
+        default:
+        return 0;
+    }
+}
+
+int32_t heuristic(char *board, chess_color_t turn) {
+    int32_t whitePoints = 0;
+    int32_t blackPoints = 0;
+    for (int32_t square = 0; square < 64; square++) {
+        int32_t points = getPiecePoints(board[square]);
+        if (getPieceColor(board[square]) == CHESS_WHITE) {
+            whitePoints += points;
+        } else {
+            blackPoints += points;
+        }
+    }
+    if (turn == CHESS_WHITE) {
+        return whitePoints - blackPoints;
+    }
+    return blackPoints - whitePoints;
+}
+
+int32_t engineStrategyNaiveHeuristic(char *board, chess_color_t turn, list_t *moves) {
+    /* single move heuristic */
+    list_t *points = list_init();
+    int32_t maxPoints = -1000000;
+    for (int32_t move = 0; move < moves -> length; move++) {
+        int32_t value = heuristic(moves -> data[move].s + 1, turn);
+        if (value > maxPoints) {
+            maxPoints = value;
+        }
+        list_append(points, (unitype) value, 'i');
+    }
+    /* determine all moves that result in maxPoints */
+    list_t *moveIndex = list_init();
+    for (int32_t move = 0; move < points -> length; move++) {
+        if (points -> data[move].i == maxPoints) {
+            list_append(moveIndex, (unitype) move, 'i');
+        }
+    }
+    list_free(points);
+    int32_t randomIndex = randomInt(0, moveIndex -> length - 1);
+    int32_t pick = moveIndex -> data[randomIndex].i;
+    list_free(moveIndex);
+    return pick;
+}
+
+int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves) {
+    int32_t lookAhead = 2; // cycles to look ahead (1 cycle is a move from each player)
+
+    return 0;
+}
+
+int32_t engineStrategyHeuristicHybrid(char *board, chess_color_t turn, list_t *moves) {
     return 0;
 }
