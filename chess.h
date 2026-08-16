@@ -586,7 +586,7 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
             if (enpassant != -1 && board[enpassant] == BLACK_PAWN_EN_PASSANT) {
                 board[enpassant] = BLANK_SPACE;
             }
-        } else if (piece == BLACK_ROOK) {
+        } else if (piece == BLACK_PAWN) {
             int8_t enpassant = up(positionTo);
             if (enpassant != -1 && board[enpassant] == WHITE_PAWN_EN_PASSANT) {
                 board[enpassant] = BLANK_SPACE;

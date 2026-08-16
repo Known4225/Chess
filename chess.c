@@ -27,6 +27,7 @@ TODO:
   - Threefold repetition
 - Graphical updates
   - Switch board perspective option
+  - See last board
   - Engine pictures
   - Support for more than two engines
   - Chat logs?
