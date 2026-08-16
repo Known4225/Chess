@@ -715,7 +715,7 @@ void render() {
     }
     tt_setColor(TT_COLOR_TEXT);
     turtleTextWriteString("Engines", (mohamedX + ryanX + buttonWidth) / 2, 150, 12, 50);
-    uint8_t greyOut = 255;
+    uint8_t greyOut;
     if (turtle.mouseX > mohamedX && turtle.mouseX < mohamedX + buttonWidth && turtle.mouseY > buttonY - 12 && turtle.mouseY < buttonY + buttonWidth * 1.25 && self.mohamedButtonEnabled) {
         self.mohamedButtonHover = 1;
     } else {
@@ -726,24 +726,28 @@ void render() {
     } else {
         self.ryanButtonHover = 0;
     }
-    tt_setColor(TT_COLOR_COMPONENT);
     if (self.mohamedButtonEnabled) {
+        tt_setColor(TT_COLOR_COMPONENT);
+        greyOut = 255;
         if (self.mohamedButtonHover) {
             tt_setColor(TT_COLOR_COMPONENT_HIGHLIGHT);
         }
     } else {
+        turtlePenColor(46, 46, 46);
         greyOut = 100;
     }
     turtleRoundedRectangle(mohamedX, buttonY - 12, mohamedX + buttonWidth, buttonY + 10, buttonWidth / 10);
     turtleTextureColor(self.mohamedImage, mohamedX, buttonY, mohamedX + buttonWidth, buttonY + buttonWidth * 1.25, 0, greyOut, greyOut, greyOut); // TODO - find a way to grey out button
     tt_setColor(TT_COLOR_TEXT);
     turtleTextWriteString("Mohamed", mohamedX + buttonWidth / 2, buttonY - 6, 6, 50);
-    tt_setColor(TT_COLOR_COMPONENT);
     if (self.ryanButtonEnabled) {
+        tt_setColor(TT_COLOR_COMPONENT);
+        greyOut = 255;
         if (self.ryanButtonHover) {
             tt_setColor(TT_COLOR_COMPONENT_HIGHLIGHT);
         }
     } else {
+        turtlePenColor(46, 46, 46);
         greyOut = 100;
     }
     turtleRoundedRectangle(ryanX, buttonY - 12, ryanX + buttonWidth, buttonY + 10, buttonWidth / 10);
