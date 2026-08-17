@@ -540,14 +540,21 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
     if (positionFrom < 0 || positionTo < 0) {
         return MOVE_PIECE_ERROR;
     }
+    for (int32_t position = 0; position < 64; position++) {
+        if (board[position] == WHITE_PAWN_EN_PASSANT) {
+            /* revert en passant to normal pawn */
+            board[position] = WHITE_PAWN;
+        }
+        if (board[position] == BLACK_PAWN_EN_PASSANT) {
+            /* revert en passant to normal pawn */
+            board[position] = BLACK_PAWN;
+        }
+    }
     char piece = board[positionFrom];
     /* check if piece is pawn (with or without en passant), rook (that hasn't moved), or king (that hasn't moved) */
     if (piece == WHITE_PAWN && positionFrom / 8 == 6 && positionTo / 8 == 4) {
         /* change normal pawn to en passant pawn */
         piece = WHITE_PAWN_EN_PASSANT;
-    } else if (piece == WHITE_PAWN_EN_PASSANT) {
-        /* revert en passant to normal pawn */
-        piece = WHITE_PAWN;
     } else if (piece == WHITE_ROOK_NO_MOVE) {
         /* revert rook to has moved */
         piece = WHITE_ROOK;
@@ -557,9 +564,6 @@ int32_t movePiece(char *board, int8_t positionFrom, int8_t positionTo) {
     } else if (piece == BLACK_PAWN && positionFrom / 8 == 1 && positionTo / 8 == 3) {
         /* change normal pawn to en passant pawn */
         piece = BLACK_PAWN_EN_PASSANT;
-    } else if (piece == BLACK_PAWN_EN_PASSANT) {
-        /* revert en passant to normal pawn */
-        piece = BLACK_PAWN;
     } else if (piece == BLACK_ROOK_NO_MOVE) {
         /* revert rook to has moved */
         piece = BLACK_ROOK;

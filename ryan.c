@@ -229,9 +229,9 @@ int32_t getPiecePoints(char code) {
 double pointHeuristic(char *board, chess_color_t turn) {
     double whitePoints = 0;
     double blackPoints = 0;
-    for (int32_t square = 0; square < 64; square++) {
-        int32_t points = getPiecePoints(board[square]);
-        if (getPieceColor(board[square]) == CHESS_WHITE) {
+    for (int32_t position = 0; position < 64; position++) {
+        int32_t points = getPiecePoints(board[position]);
+        if (getPieceColor(board[position]) == CHESS_WHITE) {
             whitePoints += points;
         } else {
             blackPoints += points;
@@ -250,10 +250,10 @@ double maxDouble(double a, double b) {
     return b;
 }
 
-double getMultiplier(char *board, int32_t square) {
-    double multiplier = (1.0 - maxDouble(fabs(square / 8 - 3.5), fabs(square % 8 - 3.5)) / 3.5) * 0.2 + 0.8; // ring distance from center of board (scaled from 0.8 to 1.0)
+double getMultiplier(char *board, int32_t position) {
+    double multiplier = (1.0 - maxDouble(fabs(position / 8 - 3.5), fabs(position % 8 - 3.5)) / 3.5) * 0.2 + 0.8; // ring distance from center of board (scaled from 0.8 to 1.0)
     /* augment multiplier based on piece type */
-    chess_piece_t piece = getPieceType(board[square]);
+    chess_piece_t piece = getPieceType(board[position]);
     switch (piece) {
         case CHESS_PIECE_PAWN:
         multiplier *= 1;
@@ -274,10 +274,10 @@ double getMultiplier(char *board, int32_t square) {
 double positionHeuristic(char *board, chess_color_t turn) {
     double whitePosition = 0;
     double blackPosition = 0;
-    for (int32_t square = 0; square < 64; square++) {
-        double multiplier = getMultiplier(board, square);
-        int32_t points = getPiecePoints(board[square]);
-        if (getPieceColor(board[square]) == CHESS_WHITE) {
+    for (int32_t position = 0; position < 64; position++) {
+        double multiplier = getMultiplier(board, position);
+        int32_t points = getPiecePoints(board[position]);
+        if (getPieceColor(board[position]) == CHESS_WHITE) {
             whitePosition += points * multiplier;
         } else {
             blackPosition += points * multiplier;
@@ -297,10 +297,10 @@ double hybridHeuristic(char *board, chess_color_t turn) {
     double whitePosition = 0;
     double blackPosition = 0;
     double totalPoints = 0;
-    for (int32_t square = 0; square < 64; square++) {
-        double multiplier = getMultiplier(board, square);
-        double points = getPiecePoints(board[square]);
-        if (getPieceColor(board[square]) == CHESS_WHITE) {
+    for (int32_t position = 0; position < 64; position++) {
+        double multiplier = getMultiplier(board, position);
+        double points = getPiecePoints(board[position]);
+        if (getPieceColor(board[position]) == CHESS_WHITE) {
             whitePoints += points;
             whitePosition += points * multiplier;
         } else {
@@ -369,7 +369,7 @@ int32_t engineStrategyHeuristic(char *board, chess_color_t turn, list_t *moves, 
         }
         list_free(possibleOpponentMoves);
         double myPoints = heuristic(moves -> data[move].s + 1, turn); // my points for this move
-        double totalPoints = -maxOpponentPoints + 0; // don't use my points until we can come up with a way to make him stop salivating over short term success (takes queen for rook trades because he's excited about the dopamine rush)
+        double totalPoints = -maxOpponentPoints + 0; // don't use my points until we can come up with a way to make him stop salivating over short term success (takes queen for rook trades because he's excited about the dopamine rush). I call this strategy "damage control"
         list_append(points, (unitype) totalPoints, 'd');
         if (totalPoints > maxPoints) {
             maxPoints = totalPoints;

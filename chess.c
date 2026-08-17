@@ -35,7 +35,6 @@ TODO:
 */
 
 #include "chess.h"
-#include "turtle.h"
 #include <time.h>
 
 #define MUTEX_ACQUIRE(mutex) while (mutex) {asm("nop");} mutex = 1
@@ -1008,9 +1007,16 @@ void mouse() {
     if (turtleKeyPressed(GLFW_KEY_SPACE)) {
         if (self.keys[KEYS_SPACE] == 0) {
             self.keys[KEYS_SPACE] = 1;
+            /* play engine move */
             MUTEX_ACQUIRE(self.boardMutex);
             printBoard(self.board);
             MUTEX_RELEASE(self.boardMutex);
+            /* check if only one engine is available */
+
+            /* use last run engine */
+
+            /* use first engine */
+
         }
     } else {
         self.keys[KEYS_SPACE] = 0;
