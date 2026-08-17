@@ -26,12 +26,11 @@ TODO:
 - Implement special stalemate conditions:
   - Threefold repetition
 - Graphical updates
-  - Switch board perspective option
+  - Switch board perspective option + auto
   - See last board
   - Engine pictures
   - Support for more than two engines
   - Chat logs?
-- Space to make engine move
 */
 
 #include "chess.h"
@@ -135,6 +134,7 @@ typedef struct {
     int8_t speech;
     int32_t speechAnimation;
     char speechContent[4096];
+    char lastEngine[256];
 } chess_t;
 
 chess_t self;
@@ -779,6 +779,7 @@ void render() {
 }
 
 int32_t engineMove(char *engineName) {
+    strcpy(self.lastEngine, engineName);
     MUTEX_ACQUIRE(self.boardMutex);
     list_t *moves = generateAllMoves(self.board, self.turn);
     /* place moves in inputFile */
@@ -1005,18 +1006,53 @@ void mouse() {
         }
     }
     if (turtleKeyPressed(GLFW_KEY_SPACE)) {
-        if (self.keys[KEYS_SPACE] == 0) {
-            self.keys[KEYS_SPACE] = 1;
+        if (self.keys[KEYS_SPACE] == 0 || self.keys[KEYS_SPACE] == 1) {
+            if (self.keys[KEYS_SPACE] == 0) {
+                self.keys[KEYS_SPACE] = 80;
+            } else {
+                self.keys[KEYS_SPACE] = 4;
+            }
             /* play engine move */
-            MUTEX_ACQUIRE(self.boardMutex);
-            printBoard(self.board);
-            MUTEX_RELEASE(self.boardMutex);
             /* check if only one engine is available */
-
-            /* use last run engine */
-
-            /* use first engine */
-
+            if (self.mohamedButtonEnabled && !self.ryanButtonEnabled) {
+                int32_t status = engineMove("mohamed.exe");
+                if (status != 0) {
+                    sprintf(self.speechContent, "ERROR: returned %d\n", status);
+                }
+                self.speech = 1;
+                self.speechAnimation = 1200;
+            } else if (self.ryanButtonEnabled && !self.mohamedButtonEnabled) {
+                int32_t status = engineMove("ryan.exe");
+                if (status != 0) {
+                    sprintf(self.speechContent, "ERROR: returned %d\n", status);
+                }
+                self.speech = 2;
+                self.speechAnimation = 1200;
+            } else if (self.ryanButtonEnabled && self.mohamedButtonEnabled) {
+                if (strlen(self.lastEngine) > 0) {
+                    /* use last run engine */
+                    int32_t status = engineMove(self.lastEngine);
+                    if (status != 0) {
+                        sprintf(self.speechContent, "ERROR: returned %d\n", status);
+                    }
+                    if (strcmp(self.lastEngine, "mohamed.exe") == 0) {
+                        self.speech = 1;
+                    } else {
+                        self.speech = 2;
+                    }
+                    self.speechAnimation = 1200;
+                } else {
+                    /* use first engine */
+                    int32_t status = engineMove("mohamed.exe");
+                    if (status != 0) {
+                        sprintf(self.speechContent, "ERROR: returned %d\n", status);
+                    }
+                    self.speech = 1;
+                    self.speechAnimation = 1200;
+                }
+            }
+        } else {
+            self.keys[KEYS_SPACE]--;
         }
     } else {
         self.keys[KEYS_SPACE] = 0;
